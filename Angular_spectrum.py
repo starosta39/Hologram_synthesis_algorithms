@@ -6,32 +6,33 @@ import time
 
 class AS_synthesis(object):
     
-    def __init__(self,  holo_pixel_size, distance, wavelength, input_matrix_size, error, iter_limit, img_size_for_syn = None):
+    def __init__(self,  holo_pixel_size, distance, wavelength, holo_size, error, iter_limit, holo_type, restored_img_size = None):
         
+        self.holo_type = holo_type
         self.name = 'Angular_spectrum'
         self._chirp_factor = None
         self._inv_chirp_factor = None
         self.holo_pixel_size = holo_pixel_size
         self.distance = distance
         self.wavelength = wavelength
-        self.input_matrix_size = input_matrix_size 
+        self.holo_size= holo_size
         self.error = error
         self.iter_limit = iter_limit 
         self.error_lists = []
-        self.scale = self.wavelength * self.distance / (self.input_matrix_size * self.holo_pixel_size**2)       
+        self.scale = self.wavelength * self.distance / (self.holo_size* self.holo_pixel_size**2)       
         
-        if img_size_for_syn  is None:
-            self.img_size_for_syn = self.input_matrix_size - int(self.input_matrix_size/2)
-        elif self.input_matrix_size % self.reshape_img_size != 0:
-            print("Некорректный ввод  нового размера изображения, исходный размер  должен делиться на него без остатка")
+        if restored_img_size  is None:
+            self.restored_img_size = self.holo_size- int(self.input_matrix_size/2)
+        elif self.holo_size % self.restored_img_size != 0:
+            print("Incorrect input of the new image size, the original size must be divided by it without remainder")
             exit()
-        else: self.img_size_for_syn = img_size_for_syn
+        else: self.restored_img_size = restored_img_size
                             
     def reshape_img_for_syn(self, input_matrix):
         new_img = np.zeros((self.input_matrix_size, self.input_matrix_size))
-        reshape_img = cv2.resize(input_matrix, (self.img_size_for_syn,self.img_size_for_syn))
-        index = int((self.input_matrix_size - self.img_size_for_syn) / 2)
-        new_img[index:index + self.img_size_for_syn, index:index + self.img_size_for_syn] = reshape_img
+        reshape_img = cv2.resize(input_matrix, (self.restored_img_size,self.restored_img_size))
+        index = int((self.holo_size- self.restored_img_size) / 2)
+        new_img[index:index + self.restored_img_size, index:index + self.restored_img_size] = reshape_img
         self.reshape_img = reshape_img
         self.new_img = new_img
         return new_img
@@ -54,7 +55,7 @@ class AS_synthesis(object):
                 np.exp(
                     np.array([
                         [
-                            1j * np.pi * self.scale * ((i- int(self.input_matrix_size / 2))**2 + (j - int(self.input_matrix_size / 2))**2) / self.input_matrix_size
+                            1j * np.pi * self.scale * ((i- int(self.holo_size/ 2))**2 + (j - int(self.holo_size/ 2))**2) / self.input_matrix_size
                             for j in range(self.input_matrix_size)
                         ]
                         for i in range(self.input_matrix_size)
@@ -111,8 +112,8 @@ class AS_synthesis(object):
     def img_recovery(self, holo):
         rec_img = abs(self.angle_spect_transform(self.prepare_for_angle_spec_transform(holo)))
         self.recovery_img  = rec_img 
-        index = int((self.input_matrix_size - self.img_size_for_syn) / 2)
-        informative_img_zone = rec_img[index:index + self.img_size_for_syn, index:index + self.img_size_for_syn]
+        index = int((self.holo_size- self.restored_img_size) / 2)
+        informative_img_zone = rec_img[index:index + self.restored_img_size, index:index + self.restored_img_size]
         self.informative_img_zone = informative_img_zone
     
     

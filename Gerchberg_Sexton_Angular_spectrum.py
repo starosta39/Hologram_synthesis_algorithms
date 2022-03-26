@@ -75,15 +75,14 @@ class AS_synthesis(object):
         if self.holo_type == "phase":
             norm_matrix = np.angle(input_matrix)
             norm_matrix = self.zero_to_two_pi_range(norm_matrix)
-            norm_matrix = np.uint8(norm_matrix * 255 / (2 * np.pi)) 
+            norm_matrix = np.uint8(norm_matrix * 256 / (2 * np.pi)) 
             if self.dynamic_range == "bin":
-                norm_matrix = cv2.threshold(norm_matrix, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_TRIANGLE)
+                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                 norm_matrix = norm_matrix[1]
-                
         elif self.holo_type == "amplitude":
-            norm_matrix = np.uint8(input_matrix * 255 / input_matrix.max())
+            norm_matrix = np.uint8(input_matrix * 256 / input_matrix.max())
             if self.dynamic_range == "bin":
-                norm_matrix = cv2.threshold(norm_matrix, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_TRIANGLE)
+                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                 norm_matrix = norm_matrix[1]
         return norm_matrix
 
@@ -150,20 +149,15 @@ class AS_synthesis(object):
 
     
     def prepare_for_angle_spec_transform (self, input_matrix):
-        input_matrix  = input_matrix * 2 * np.pi / 256
-        return np.exp(1j * input_matrix)
-
+        return np.exp(1j * input_matrix * 2 * np.pi / 256)
+        
 
     def img_recovery(self, holo):
         if self.holo_type == "phase":
-            rec_img = abs(
-                            self.angle_spect_transform( 
-                                                        self.prepare_for_angle_spec_transform(holo)
-                                                    )
-                        ) 
+            rec_img = abs(self.angle_spect_transform(self.prepare_for_angle_spec_transform(holo)))
         elif self.holo_type == "amplitude":
             rec_img = abs(self.angle_spect_transform(holo))
-            rec_img = self.del_central_zone(rec_img)
+            # rec_img = self.del_central_zone(rec_img)
         rec_img  = rec_img**2   
         plt.imshow(rec_img, cmap = "gray")
         plt.show()
@@ -192,7 +186,8 @@ class AS_synthesis(object):
         ab = np.sum(input_matrix*real_img)
         return np.sqrt(1-(ab*ab)/(a*b))
 
-    def __call__(self, input_matrix, reshaped_img_coord_h_w = (None, None)):
+
+    def __call__(self, input_matrix,  control=False, reshaped_img_coord_h_w = (None, None)):
         self.reshaped_img_coord_h, self.reshaped_img_coord_w = reshaped_img_coord_h_w
         error_list = []
         start_time = time.time()
@@ -208,26 +203,24 @@ class AS_synthesis(object):
                                     abs(self.informative_zone(ref_img))**2,
                                     self.informative_zone(img)
                                     )
-            
+
             # plt.imshow(abs(ref_img)**2) 
             # plt.show()                      
             ref_img = np.sqrt(img) * np.exp(1j*np.angle(ref_img))
             holo = self.inverse_angle_spect_transform(ref_img)
             if self.holo_type == "phase":
-                holo = np.exp(1j*np.angle(holo))
+                holo = np.exp(1j * np.angle(holo))
             elif self.holo_type == "amplitude": 
                 holo = abs(holo)
             i += 1 
             error_list.append(error)
-            print("Iteration ", i, "error ", error)
-            
+            print("Iteration ", i, "error ", error) 
+
         self.iteration = i
         self.error_lists.append(error_list)
-
         holo = self.matrix_normalization(holo)
-        # plt.imshow(abs()cmap="gray")
-        # plt.show()
-        self.img_recovery(holo)
+        if control:
+            self.img_recovery(holo)
 
         self.holo = holo
         print("--- %s seconds ---" % (time.time() - start_time))
@@ -235,17 +228,20 @@ class AS_synthesis(object):
 
 transform = AS_synthesis(
     holo_pixel_size = 8e-6,
-    distance = 0.5,
+    distance = 0.1,
     wavelength = 532e-9,
     holo_size = 1024,
     error = 1e-9,
     iter_limit = 10,
-    restored_img_size = None,
-    holo_type = "phase",
+    restored_img_size = 400,
+    holo_type = "amplitude",
     dynamic_range = 'bin'
 )
 
+
+
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(img, reshaped_img_coord_h_w = (None,None))
-plt.imshow(holo, cmap = "gray")
-plt.show() 
+holo = transform(img, reshaped_img_coord_h_w = (100,100), control=True )
+
+# plt.imshow(holo, cmap = "gray")
+# plt.show() 

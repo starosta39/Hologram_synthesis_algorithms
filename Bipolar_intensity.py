@@ -2,26 +2,29 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import time 
-import cmath
 
-class BP_synthesis(object):
-    
-    def __init__(self,   wavelength, 
+class BP_synthesis(object): 
+    def __init__(self,
+                 del_area,
+                 wavelength, 
                  holo_size, 
-                 reshaped_img_coord_x,
-                 reshaped_img_coord_y,
+                 holo_type,
+                 rand_phase_mask,                 
+                 dynamic_range,
                  near_zone = True,
                  distance = None,
-                 img_size_for_syn = None,
+                 restored_img_size = None,
                  holo_pixel_size = None
                 ):
+        self.rand_phase_mask = rand_phase_mask
+        self.dynamic_range = dynamic_range
+        self.del_area = del_area
+        self.holo_type = holo_type
         self.name = 'Bipolar_intensity'
         self.near_zone = near_zone
         self.holo_size = holo_size
         self.distance = distance
         self.wavelength = wavelength
-        self.reshaped_img_coord_x = reshaped_img_coord_x
-        self.reshaped_img_coord_y = reshaped_img_coord_y 
         self.error_list = []
         
         if near_zone:
@@ -32,18 +35,18 @@ class BP_synthesis(object):
             self.holo_pixel_size =  holo_pixel_size
             self.scale = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
         
-        if img_size_for_syn  is None:
-            self.img_size_for_syn = self.holo_size - int(self.holo_size/2)
-        else: self.img_size_for_syn = img_size_for_syn
+        if restored_img_size  is None:
+            self.restored_img_size =  int(self.holo_size / 2)
+        else: self.restored_img_size = restored_img_size
             
             
     def reshape_img_for_syn(self, input_matrix):
         new_img = np.zeros((self.holo_size, self.holo_size)) 
-        reshape_img = cv2.resize(input_matrix, (self.img_size_for_syn,self.img_size_for_syn))
+        reshape_img = cv2.resize(input_matrix, (self.restored_img_size,self.restored_img_size))
         self.reshape_img = reshape_img
         new_img[
-                self.reshaped_img_coord_y:self.reshaped_img_coord_y + self.img_size_for_syn, 
-                self.reshaped_img_coord_x:self.reshaped_img_coord_x + self.img_size_for_syn
+                self.reshaped_img_coord_h:self.reshaped_img_coord_h + self.restored_img_size, 
+                self.reshaped_img_coord_w:self.reshaped_img_coord_w + self.restored_img_size
                 ] = reshape_img
         self.new_img = new_img 
         return new_img  
@@ -128,45 +131,56 @@ class BP_synthesis(object):
     
     def del_central_zone(self,input_matrix):
         central_point = int(self.holo_size / 2)
-        input_matrix[central_point - 1:central_point + 1, central_point - 1:central_point + 1] = 0
+        input_matrix[central_point - 5:central_point + 5, central_point - 5:central_point + 5] = 0
         return input_matrix
     
+    def informative_zone (self, input_matrix):
+        res = input_matrix[
+                self.reshaped_img_coord_h:self.reshaped_img_coord_h + self.restored_img_size, 
+                self.reshaped_img_coord_w:self.reshaped_img_coord_w + self.restored_img_size,
+                ]
+        return res
+
     def img_recovery(self, holo):
         if self.near_zone:
-            rec_img = abs(self.inverse_frenel_transform(self.prepare_for_transform(holo)))
+            if self.holo_type == "phase":
+                rec_img = abs(self.inverse_frenel_transform(self.prepare_for_transform(holo)))
+            elif self.holo_type == "amplitude":
+                rec_img = abs(self.frenel_transform(holo))
+            rec_img = rec_img**2
             rec_img = self.del_central_zone(rec_img)
             plt.plot(rec_img)
             plt.show()
             plt.imshow(rec_img, cmap = 'gray')
             plt.show()
-            cv2.imwrite("C:\\Users\\minik\\Desktop\\10.bmp",rec_img*255/rec_img.max())
         else:
-            rec_img = abs(self.fourier_transform(self.prepare_for_transform(holo)))
+            if self.holo_type == "phase":
+                rec_img = abs(self.fourier_transform(self.prepare_for_transform(holo)))
+            elif self.holo_type == "amplitude":
+                rec_img = abs(self.fourier_transform(holo))
             rec_img = self.del_central_zone(rec_img)
             plt.plot(rec_img)
             plt.show()
             plt.imshow(rec_img, cmap = 'gray')
             plt.show()
         self.recovery_img  = rec_img   
-        informative_img_zone = rec_img [
-                                    self.reshaped_img_coord_y:self.reshaped_img_coord_y + self.img_size_for_syn, 
-                                    self.reshaped_img_coord_x:self.reshaped_img_coord_x + self.img_size_for_syn
-            
-                                    ]
-        
-        self.informative_img_zone = informative_img_zone
+        self.informative_img_zone = self.informative_zone(rec_img )
     
     
     def matrix_normalization(self, input_matrix):
-        norm_matrix = np.zeros((self.holo_size, self.holo_size)) 
-        for i in range (self.holo_size):
-            for j in range (self.holo_size):
-                element = cmath.phase(input_matrix[i,j])
-                if element < 0:
-                    element = 2 * np.pi + element
-                element = element/(2 * np.pi) * 256
-                norm_matrix[i,j] = element
-        return norm_matrix.astype('uint8')
+        if self.holo_type == "phase":
+            norm_matrix = np.angle(input_matrix)
+            norm_matrix = self.zero_to_two_pi_range(norm_matrix)
+            norm_matrix = np.uint8(norm_matrix * 256 / (2 * np.pi)) 
+            if self.dynamic_range == "bin":
+                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+                norm_matrix = norm_matrix[1]
+        elif self.holo_type == "amplitude":
+            norm_matrix = np.uint8(input_matrix * 256 / input_matrix.max())
+            if self.dynamic_range == "bin":
+                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+                norm_matrix = norm_matrix[1]
+        return norm_matrix
     
     def prepare_for_transform (self, input_matrix):
         return np.exp(1j * input_matrix * 2 * np.pi / 255)
@@ -183,20 +197,26 @@ class BP_synthesis(object):
         mask = np.int8(np.random.rand(self.holo_size,self.holo_size) * 2)       
         return input_matrix * np.exp(1j * np.pi * mask)    
     
-    def __call__(self, input_matrix):
+    def __call__(self, input_matrix, reshaped_img_coord_h_w = (None,None), control=False):
         start_time = time.time()
+        error = None
+        self.reshaped_img_coord_h,self.reshaped_img_coord_w = reshaped_img_coord_h_w
         img = self.reshape_img_for_syn(input_matrix)
-        img  = self.phase_mask(img)
+            
+        if self.rand_phase_mask:
+            img  = self.phase_mask(img)
         if self.near_zone:
             holo = self.frenel_transform(img)
         else :
             holo = self.fourier_transform(img)
         holo = 2 * (np.real(holo) - np.real(holo).min())
         holo = np.uint8(holo * 255 /holo.max())
-        self.img_recovery(holo)
-        error = self.calc_error( self.informative_img_zone, self.reshape_img)
-        print("Error ", error)
-        
+        if self.dynamic_range == "bin":
+            holo = cv2.threshold(holo, 0, 127,  cv2.THRESH_OTSU)[1]
+        if control:
+            self.img_recovery(holo)
+            error = self.calc_error(self.informative_img_zone, self.reshape_img)
+        print("Error ", error)  
         self.error_list.append(error)
         print("Time --- %s seconds ---" % (time.time() - start_time))
         self.holo  = holo
@@ -204,13 +224,21 @@ class BP_synthesis(object):
             
 
 transform = BP_synthesis(
+del_area = 5,
 wavelength = 532e-9,
 holo_size = 1024,
-reshaped_img_coord_x = 200,
-reshaped_img_coord_y = 200,
-img_size_for_syn = 256,
-near_zone = False,
-#     distance = 0.1,
-#     holo_pixel_size = 8e-6
-    
+restored_img_size = 256,
+near_zone = True,
+holo_type = "phase",
+dynamic_range = 'gray',
+rand_phase_mask  = True,
+distance = 0.5,
+holo_pixel_size = 8e-6   
 )
+img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
+holo = transform(img, reshaped_img_coord_h_w = (200,200),  control=True)
+plt.imshow(holo, cmap = "gray")
+plt.show()
+print(holo)
+print(holo.max())
+print(holo.min())

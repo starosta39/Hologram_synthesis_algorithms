@@ -8,7 +8,7 @@ class GS_Frenel_synthesis(object):
     def __init__(self, 
                  holo_pixel_size, 
                  distance, wavelength, 
-                 holo_size, error, 
+                 holo_size, error_dif, 
                  iter_limit, holo_type, 
                  dynamic_range,
                   restored_img_size = None
@@ -25,7 +25,7 @@ class GS_Frenel_synthesis(object):
         self.distance = distance
         self.wavelength = wavelength
         self.holo_size = holo_size 
-        self.error = error
+        self.error_dif= error_dif
         self.iter_limit = iter_limit 
         self.error_lists = []
         self.img_pixel_size = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size)
@@ -65,28 +65,26 @@ class GS_Frenel_synthesis(object):
                 self.reshaped_img_coord_w:self.reshaped_img_coord_w + self.restored_img_size,
                 ]
         return res
+        
     # function for translating an argument from a range [0 2*pi) to  (-pi,pi]
     def zero_to_two_pi_range(self, phase): 
         return (phase + 2 * np.pi) * (phase < 0) + (phase) * (phase >= 0)
     
-
     def matrix_normalization(self, input_matrix):
         if self.holo_type == "phase":
             norm_matrix = np.angle(input_matrix)
             norm_matrix = self.zero_to_two_pi_range(norm_matrix)
-            norm_matrix = np.uint8(norm_matrix * 256 / (2 * np.pi)) 
+            norm_matrix = np.uint8(norm_matrix * 255 / (2 * np.pi)) 
             if self.dynamic_range == "bin":
-                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_OTSU)
                 norm_matrix = norm_matrix[1]
         elif self.holo_type == "amplitude":
-            norm_matrix = np.uint8(input_matrix * 256 / input_matrix.max())
+            norm_matrix = np.uint8(input_matrix * 255 / input_matrix.max())
             if self.dynamic_range == "bin":
-                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+                norm_matrix = cv2.threshold(norm_matrix, 0, 127, cv2.THRESH_OTSU)
                 norm_matrix = norm_matrix[1]
         return norm_matrix
-
-        
-    
+ 
 
     @property
     def first_frenel_factor(self):
@@ -102,7 +100,6 @@ class GS_Frenel_synthesis(object):
                     ])
                 )
             ) 
-
         return self._first_frenel_factor
 
     @property
@@ -147,9 +144,10 @@ class GS_Frenel_synthesis(object):
                     for i in range(self.holo_size)
                 ])
             )
-            
-
         return self._second_inv_frenel_factor
+
+    def zero_to_two_pi_range(self, phase): 
+        return (phase + 2 * np.pi) * (phase < 0) + (phase) * (phase >= 0)
 
     def frenel_transform(self,input_matrix):
         fourier = np.fft.ifftshift(np.fft.fft2(np.fft.fftshift(input_matrix * self.first_frenel_factor)))
@@ -186,6 +184,7 @@ class GS_Frenel_synthesis(object):
         self.informative_img_zone = self.informative_zone(rec_img)
         plt.imshow(self.informative_img_zone, cmap = "gray")
         plt.show()
+
         
     def __call__(self, input_matrix, control, reshaped_img_coord_h_w = (None,None)):
         self.reshaped_img_coord_h, self.reshaped_img_coord_w = reshaped_img_coord_h_w
@@ -195,9 +194,10 @@ class GS_Frenel_synthesis(object):
         img = self.reshape_img_for_syn(input_matrix)
         plt.imshow(img, cmap="gray")
         plt.show()
-        error = float('inf')
+        error_dif = float('inf')
+        last_error_dif = 0
         i = 0
-        while error > self.error and i < self.iter_limit:
+        while error_dif > self.error_dif and i < self.iter_limit:
             ref_img = self.frenel_transform(holo)
             error = self.calc_error(
                                     abs(self.informative_zone(ref_img))**2,
@@ -206,12 +206,18 @@ class GS_Frenel_synthesis(object):
             ref_img = np.sqrt(img) * np.exp(1j*np.angle(ref_img))
             holo = self.inverse_frenel_transform(ref_img)
             if self.holo_type == "phase":
-                holo = np.exp(1j * np.angle(holo))
+                if self.dynamic_range == "bin":
+                    holo = self.zero_to_two_pi_range(np.angle(holo))
+                    holo = cv2.threshold(np.uint8(holo * 255 / (2 * np.pi)), 0, 127, cv2.THRESH_OTSU)[1]
+                    holo = np.exp(1j * holo * np.pi / 127 )
+                else:
+                    holo = np.exp(1j * np.angle(holo))
             elif self.holo_type == "amplitude": 
+                
                 holo = abs(holo)
             i += 1 
             error_list.append(error)
-            print("Iteration ", i, "error ", error) 
+            print("Iteration ", i, "error(informative zone)", error) 
             
         self.iteration = i
         self.error_lists.append(error_list)
@@ -224,17 +230,24 @@ class GS_Frenel_synthesis(object):
 
 transform = GS_Frenel_synthesis(
     holo_pixel_size = 8e-6,
-    distance = 0.1,
+    distance = 0.5,
     wavelength = 532e-9,
     holo_size = 1024,
-    error = 1e-4,
+    error_dif = 1e-4,
     holo_type = 'amplitude',
-    dynamic_range = "gray",
-    iter_limit = 50,
+    dynamic_range = "bin",
+    iter_limit = 20,
     restored_img_size=400
 )
 
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
 holo = transform(img, reshaped_img_coord_h_w = (100,100),  control=True)
-
-
+# cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
+#  # print(holo)
+# # # plt.imshow(holo, cmap = 'gray')
+# # plt.show()
+# holo = cv2.imread("C:\\Users\\minik\\Desktop\\lena_holo.bmp", cv2.IMREAD_GRAYSCALE)
+# plt.imshow((abs(transform.frenel_transform(holo)))**2, cmap = 'gray')
+# plt.show()
+# # plt.plot(abs(transform.frenel_transform(np.exp(1j*holo)))**2)
+# # plt.show()

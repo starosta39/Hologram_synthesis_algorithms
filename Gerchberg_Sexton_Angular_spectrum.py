@@ -166,11 +166,11 @@ class AS_synthesis(object):
         plt.imshow(self.informative_img_zone, cmap = "gray")
         plt.show()
 
-    # function for translating an argument from a range [0 2*pi) to  (-pi,pi]
+    # function for translating an argument from a range (-pi,pi] to  [0 2*pi)
     def zero_to_two_pi_range(self, phase): 
         return (phase + 2 * np.pi) * (phase < 0) + (phase) * (phase >= 0)
     
-    # function for translating an argument from a range (-pi,pi] to  [0 2*pi)
+    # function for translating an argument from a range [0 2*pi) to  (-pi,pi]
     def pi_to_pi_range(self, phase):
         res = (( phase - 2*np.pi) * (phase > np.pi) 
                 + (2 * np.pi + phase) * (phase <= -np.pi) 
@@ -232,7 +232,7 @@ transform = AS_synthesis(
     wavelength = 532e-9,
     holo_size = 1024,
     error = 1e-9,
-    iter_limit = 10,
+    iter_limit = 20,
     restored_img_size = 400,
     holo_type = "amplitude",
     dynamic_range = 'bin'
@@ -241,7 +241,10 @@ transform = AS_synthesis(
 
 
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(img, reshaped_img_coord_h_w = (100,100), control=True )
+holo = transform(img, reshaped_img_coord_h_w = (100, 100), control=True )
+cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
+
+
 
 # plt.imshow(holo, cmap = "gray")
 # plt.show() 

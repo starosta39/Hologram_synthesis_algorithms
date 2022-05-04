@@ -131,7 +131,9 @@ class BP_synthesis(object):
     
     def del_central_zone(self,input_matrix):
         central_point = int(self.holo_size / 2)
-        input_matrix[central_point - 5:central_point + 5, central_point - 5:central_point + 5] = 0
+        input_matrix[
+            central_point - self.del_area:central_point + self.del_area, central_point - self.del_area:central_point + self.del_area
+        ] = 0
         return input_matrix
     
     def informative_zone (self, input_matrix):
@@ -146,7 +148,7 @@ class BP_synthesis(object):
             if self.holo_type == "phase":
                 rec_img = abs(self.inverse_frenel_transform(self.prepare_for_transform(holo)))
             elif self.holo_type == "amplitude":
-                rec_img = abs(self.frenel_transform(holo))
+                rec_img = abs(self.inverse_frenel_transform(holo))
             rec_img = rec_img**2
             rec_img = self.del_central_zone(rec_img)
             plt.plot(rec_img)
@@ -224,15 +226,15 @@ class BP_synthesis(object):
             
 
 transform = BP_synthesis(
-del_area = 5,
+del_area = 100,
 wavelength = 532e-9,
 holo_size = 1024,
 restored_img_size = 256,
 near_zone = True,
 holo_type = "phase",
-dynamic_range = 'gray',
+dynamic_range = 'bin',
 rand_phase_mask  = True,
-distance = 0.5,
+distance = 0.9,
 holo_pixel_size = 8e-6   
 )
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)

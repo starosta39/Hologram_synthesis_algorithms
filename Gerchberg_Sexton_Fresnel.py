@@ -16,7 +16,7 @@ class GS_Fresnel_synthesis(object):
 
         self.dynamic_range = dynamic_range
         self.holo_type = holo_type
-        self.name = 'Gerchberg_Sexton'
+        self.name = 'GS_Fresnel'
         self._first_fresnel_factor = None
         self._second_fresnel_factor = None
         self._first_inv_fresnel_factor = None

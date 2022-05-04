@@ -6,19 +6,20 @@ import time
 
 class AS_synthesis(object):
     
-    def __init__(self, 
-                holo_pixel_size,
-                distance, 
-                wavelength, 
-                holo_size,
-                error,
-                iter_limit, 
-                holo_type,
-                dynamic_range,
-                restored_img_size = None):
+    def __init__(
+                    self, 
+                    holo_pixel_size,
+                    distance, 
+                    wavelength, 
+                    holo_size,
+                    error,
+                    iter_limit, 
+                    holo_type,
+                    dynamic_range,
+                ):
         self.dynamic_range = dynamic_range
         self.holo_type = holo_type
-        self.name = 'Angular_spectrum'
+        self.name = 'GS_angular_spectrum'
         self._chirp_factor = None
         self._inv_chirp_factor = None
         self.holo_pixel_size = holo_pixel_size
@@ -29,41 +30,41 @@ class AS_synthesis(object):
         self.iter_limit = iter_limit 
         self.error_lists = []
         self.scale = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)       
-        
-        
+                            
+    def reshape_img_for_syn(self, input_matrix, position, restored_img_size, reshaped_img_position_coord_h_w ):
 
         if restored_img_size  is None:
-            self.restored_img_size = int(holo_size / 2 )
-        elif self.holo_size % restored_img_size != 0 and self.holo_type == 'phase':
-            print("Incorrect input of the new image size, the original size must be divided by it without remainder")
-            exit()
+            self.restored_img_size = int(self.holo_size / 2 )
         else: self.restored_img_size = restored_img_size
-                            
-    def reshape_img_for_syn(self, input_matrix):
         
         new_img = np.zeros((self.holo_size, self.holo_size))
         reshape_img = cv2.resize(input_matrix, (self.restored_img_size,self.restored_img_size))
-        if self.holo_type == "phase":
+        if position == "centre":
             index = int((self.holo_size - self.restored_img_size) / 2)
             new_img[index:index + self.restored_img_size, index:index + self.restored_img_size] = reshape_img
-        elif self.holo_type == "amplitude":
+        elif position == "free":
             new_img[
-                self.reshaped_img_coord_h:self.reshaped_img_coord_h + self.restored_img_size, 
-                self.reshaped_img_coord_w:self.reshaped_img_coord_w + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size, 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
                 ] = reshape_img
+        else:
+            print("Incorre input, the argument 'position' must be equal center/free, but not ", position)
         self.reshape_img = reshape_img
         self.new_img = new_img
         return new_img
 
-    def informative_zone (self, input_matrix):
-        if self.holo_type == "phase":
+    def informative_zone (self,input_matrix, position, reshaped_img_position_coord_h_w):
+
+        if position == "centre":
             index = int((self.holo_size - self.restored_img_size) / 2)
             res  = input_matrix[index:index + self.restored_img_size, index:index + self.restored_img_size]
-        elif self.holo_type == "amplitude":
+        elif position == "free":
             res = input_matrix[
-                self.reshaped_img_coord_h:self.reshaped_img_coord_h + self.restored_img_size, 
-                self.reshaped_img_coord_w:self.reshaped_img_coord_w + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w[0] + self.restored_img_size, 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
                 ]
+        else:
+            print("Incorre input, the argument 'position' must be equal center/free, but not ", position)
         return res
 
     def del_central_zone(self,input_matrix):
@@ -152,17 +153,19 @@ class AS_synthesis(object):
         return np.exp(1j * input_matrix * 2 * np.pi / 256)
         
 
-    def img_recovery(self, holo):
+    def img_recovery(self, holo, position, reshaped_img_position_coord_h_w):
         if self.holo_type == "phase":
             rec_img = abs(self.angle_spect_transform(self.prepare_for_angle_spec_transform(holo)))
         elif self.holo_type == "amplitude":
             rec_img = abs(self.angle_spect_transform(holo))
-            # rec_img = self.del_central_zone(rec_img)
+        else: 
+            print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)
+
         rec_img  = rec_img**2   
+        self.rec_img = rec_img
         plt.imshow(rec_img, cmap = "gray")
         plt.show()
-
-        self.informative_img_zone = self.informative_zone(rec_img)
+        self.informative_img_zone = self.informative_zone(rec_img, position, reshaped_img_position_coord_h_w)
         plt.imshow(self.informative_img_zone, cmap = "gray")
         plt.show()
 
@@ -187,25 +190,31 @@ class AS_synthesis(object):
         return np.sqrt(1-(ab*ab)/(a*b))
 
 
-    def __call__(self, input_matrix,  control=False, reshaped_img_coord_h_w = (None, None)):
-        self.reshaped_img_coord_h, self.reshaped_img_coord_w = reshaped_img_coord_h_w
+    def __call__(
+                    self, 
+                    input_matrix,  
+                    control=False,
+                    position=None, 
+                    restored_img_size=None,
+                     reshaped_img_position_coord_h_w = (None,None)
+                ):
+        self.reshaped_img_coord_h, self.reshaped_img_coord_w =  reshaped_img_position_coord_h_w
         error_list = []
         start_time = time.time()
         holo = self.initial_approx()
-        img = self.reshape_img_for_syn(input_matrix)
-        plt.imshow(img, cmap="gray")
-        plt.show()
+        img = self.reshape_img_for_syn(input_matrix, position, restored_img_size, reshaped_img_position_coord_h_w)
+        if control:
+            plt.imshow(img, cmap="gray")
+            plt.show()
         i = 0
         error = float("inf") 
         while error > self.error and i < self.iter_limit:
             ref_img = self.angle_spect_transform(holo)
             error = self.calc_error(
-                                    abs(self.informative_zone(ref_img))**2,
-                                    self.informative_zone(img)
-                                    )
-
-            # plt.imshow(abs(ref_img)**2) 
-            # plt.show()                      
+                                    abs(self.informative_zone(ref_img, position, reshaped_img_position_coord_h_w))**2,
+                                    self.informative_zone(img,position, reshaped_img_position_coord_h_w)
+                                    )          
+                  
             ref_img = np.sqrt(img) * np.exp(1j*np.angle(ref_img))
             holo = self.inverse_angle_spect_transform(ref_img)
             if self.holo_type == "phase":
@@ -220,8 +229,7 @@ class AS_synthesis(object):
         self.error_lists.append(error_list)
         holo = self.matrix_normalization(holo)
         if control:
-            self.img_recovery(holo)
-
+            self.img_recovery(holo, position, reshaped_img_position_coord_h_w)
         self.holo = holo
         print("--- %s seconds ---" % (time.time() - start_time))
         return holo
@@ -233,15 +241,14 @@ transform = AS_synthesis(
     holo_size = 1024,
     error = 1e-9,
     iter_limit = 20,
-    restored_img_size = 400,
     holo_type = "amplitude",
-    dynamic_range = 'bin'
+    dynamic_range = 'gray'
 )
 
 
 
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(img, reshaped_img_coord_h_w = (100, 100), control=True )
+holo = transform(img, position='free', reshaped_img_position_coord_h_w = (100,100), restored_img_size=200,  control=True )
 cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
 
 

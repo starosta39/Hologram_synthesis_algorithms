@@ -3,31 +3,27 @@ import cv2
 import matplotlib.pyplot as plt
 import time 
 import cmath
-import copy
 import random
-from Bipolar_intensity import BP_synthesis
 
 
-class DE_syntesis(BP_synthesis):
+class DE_syntesis(object):
 
-    def __init__(self,   wavelength, 
+    def __init__(self,  
+                 del_area,
+                 wavelength, 
                  holo_size, 
                  mod,
-                 reshaped_img_coord_x = None,
-                 reshaped_img_coord_y = None,
                  near_zone = True,
                  distance = None,
-                 img_size_for_syn = None,
                  holo_pixel_size = None
                 ):
+        self.del_area = del_area 
         self.mod = mod
         self.name = 'Bipolar_intensity'
         self.near_zone = near_zone
         self.holo_size = holo_size
         self.distance = distance
         self.wavelength = wavelength
-        self.reshaped_img_coord_x = reshaped_img_coord_x
-        self.reshaped_img_coord_y = reshaped_img_coord_y 
         self.error_list = []
         
         if near_zone:
@@ -42,25 +38,27 @@ class DE_syntesis(BP_synthesis):
             self.scale_h_inverse = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
             self.scale_w_inverse = self.wavelength * self.distance / (self.holo_size * 2 * self.holo_pixel_size**2)
         
-        if img_size_for_syn  is None:
-            self.img_size_for_syn = self.holo_size - int(self.holo_size/2)
-        else: self.img_size_for_syn = img_size_for_syn
             
-            
-    def reshape_img_for_syn(self, input_matrix):
+    def reshape_img_for_syn(self, input_matrix, position, restored_img_size, reshaped_img_position_coord_h_w):
+
+        if restored_img_size  is None:
+            self.restored_img_size = int(self.holo_size / 2 )
+        else: self.restored_img_size = restored_img_size
+        
         new_img = np.zeros((self.holo_size, self.holo_size)) 
-        reshape_img = cv2.resize(input_matrix, (self.img_size_for_syn,self.img_size_for_syn))
+        reshape_img = cv2.resize(input_matrix, (self.restored_img_size, self.restored_img_size))
         self.reshape_img = reshape_img
-        if self.reshaped_img_coord_x is not None and self.reshaped_img_coord_y is not None:  
+
+        if position == "centre":
+            index = int((self.holo_size - self.restored_img_size) / 2)
+            new_img[index:index + self.restored_img_size, index:index + self.restored_img_size] = reshape_img     
+        elif position == "free":
             new_img[
-                    self.reshaped_img_coord_y:self.reshaped_img_coord_y + self.img_size_for_syn, 
-                    self.reshaped_img_coord_x:self.reshaped_img_coord_x + self.img_size_for_syn
-                    ] = reshape_img     
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size, 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
+                ] = reshape_img
         else:
-            index = int((self.holo_size - self.img_size_for_syn) / 2)
-            new_img[
-                    index:index + self.img_size_for_syn, index:index + self.img_size_for_syn
-                    ] = reshape_img            
+            print("Incorre input, the argument 'position' must be equal center/free, but not ", position)           
         self.new_img = new_img 
         return new_img
         
@@ -113,8 +111,6 @@ class DE_syntesis(BP_synthesis):
                     for i in range(self.holo_size)
                 ])
             )
-            plt.imshow(np.angle(self._first_inv_fresnel_factor))
-            plt.show()
             
         return self._first_inv_fresnel_factor
 
@@ -150,12 +146,12 @@ class DE_syntesis(BP_synthesis):
         return np.fft.ifftshift(np.fft.ifft2(np.fft.ifftshift(input_matrix)))
     
     def del_central_zone(self,input_matrix):
-        central_point_x = int(input_matrix.shape[0] / 2)
-        central_point_y = int(input_matrix.shape[1] / 2)
-        input_matrix[central_point_x - 1:central_point_x + 1, central_point_y - 1:central_point_y + 1 ] = 0
+        if self.del_area > 0  or self.del_area != None:
+            central_point_h = int(input_matrix.shape[0] / 2)
+            central_point_w = int(input_matrix.shape[1] / 2)
+            input_matrix[central_point_h - self.del_area: central_point_h + self.del_area, central_point_w - 1:central_point_w + 1 ] = 0
         return input_matrix
-    # central_point_y - 10
-    # central_point_y + 10
+
     def img_recovery(self, holo):
         if self.near_zone:
             rec_img = abs(self.inverse_fresnel_transform(self.prepare_for_transform(holo)))
@@ -165,32 +161,19 @@ class DE_syntesis(BP_synthesis):
             rec_img = abs(self.inverse_fourier_transform(self.prepare_for_transform(holo)))
             rec_img = self.del_central_zone(rec_img)
 
-        self.recovery_img  = rec_img 
-        if self.reshaped_img_coord_x is not None and self.reshaped_img_coord_y is not None:
-            informative_img_zone = rec_img [
-                                        self.reshaped_img_coord_y:self.reshaped_img_coord_y + self.img_size_for_syn, 
-                                        self.reshaped_img_coord_x:self.reshaped_img_coord_x + self.img_size_for_syn        
-                                        ]
-        else:
-            index = int((self.holo_size - self.img_size_for_syn) / 2)
-            informative_img_zone = rec_img [
-                                            index:index + self.img_size_for_syn, index:index + self.img_size_for_syn
-                                            ]
-        self.informative_img_zone = informative_img_zone
-        # plt.plot(self.recovery_img )
-        # plt.show()
+        plt.plot(rec_img)
+        plt.show()
+
+        plt.imshow(rec_img, cmap = 'gray')
+        plt.show()
+
+         
     
     
     def matrix_normalization(self, input_matrix):
-        norm_matrix = np.zeros((self.holo_size, self.holo_size)) 
-        for i in range (self.holo_size):
-            for j in range (self.holo_size):
-                element = cmath.phase(input_matrix[i,j])
-                if element < 0:
-                    element = 2 * np.pi + element
-                element = element/(2 * np.pi) * 256
-                norm_matrix[i,j] = element
-        return norm_matrix.astype('uint8')
+        norm_matrix = self.zero_to_two_pi_range(input_matrix)
+        norm_matrix = np.uint8(input_matrix * 255 /(2 * np.pi))
+        return norm_matrix
     
 
     # Загоняет интовскую матрицу в экспоненту и нормирует на 2 пи 
@@ -209,8 +192,8 @@ class DE_syntesis(BP_synthesis):
         mask = np.int8(np.random.rand(self.holo_size,self.holo_size) * 2)       
         return input_matrix * np.exp(1j * np.pi * mask)   
 
-    def other_angle(self, angles):
-        return (2*np.pi + angles) * (angles < 0) + angles*(angles > 0)
+    def zero_to_two_pi_range(self, angles):
+        return (2*np.pi + angles) * (angles < 0) + angles*(angles >= 0)
 
     
     def generate_doubph_enc_matrix(self, teta_1, teta_2, size, mod):        
@@ -246,9 +229,12 @@ class DE_syntesis(BP_synthesis):
             
     
 
-    def __call__(self, input_matrix):
+    def __call__(self, input_matrix, position = None,  restored_img_size=None, reshaped_img_position_coord_h_w=(None, None),control=False ):
         start_time = time.time()
-        img = self.reshape_img_for_syn(input_matrix)
+        img = self.reshape_img_for_syn(input_matrix, position, restored_img_size, reshaped_img_position_coord_h_w )
+        if control: 
+            plt.imshow(img, cmap='gray')
+            plt.show()
         img  = self.phase_mask(img)
         if self.near_zone:
             holo = self.fresnel_transform(img)
@@ -263,22 +249,22 @@ class DE_syntesis(BP_synthesis):
         teta_1 =  phase + del_phi
         teta_2 = phase - del_phi 
         dbphase_holo = self.generate_doubph_enc_matrix(teta_1, teta_2, (self.holo_size, self.holo_size * 2), self.mod )
-        dbphase_holo = self.other_angle(dbphase_holo)
-        dbphase_holo = np.uint8(dbphase_holo * 255 /(2 * np.pi))
+        dbphase_holo = self.matrix_normalization(dbphase_holo)
         # до этого момента все отрабатывает нормально 
-       
+        if control:
+            self.img_recovery(dbphase_holo)
         # часть, которая восстанавливает, чтобы проверить 
-        a = self.inverse_fresnel_transform(self.prepare_for_transform(dbphase_holo))
+        # a = self.inverse_fresnel_transform(self.prepare_for_transform(dbphase_holo))
         # a = self.inverse_fresnel_transform(dbphase_holo)
         # a = self.del_central_zone(a)
 
-        plt.plot(abs(a))
-        plt.show()
-        a = abs(a) * 255/abs(a).max()
+        # plt.plot(abs(a))
+        # plt.show()
+        # a = abs(a) * 255/abs(a).max()
 
-        cv2.imwrite("C:\\Users\\minik\\Desktop\\def_2.bmp", a )
-        plt.imshow(a, cmap = 'gray')
-        plt.show()
+        # cv2.imwrite("C:\\Users\\minik\\Desktop\\def_2.bmp", a )
+        # plt.imshow(a, cmap = 'gray')
+        # plt.show()
         # plt.plot(abs(a))
         # plt.show()
 
@@ -296,16 +282,14 @@ class DE_syntesis(BP_synthesis):
         return dbphase_holo
 
 syntesis = DE_syntesis(
+                        del_area = 1,
                         wavelength = 532e-9,
                         holo_size = 1024,
-                        # reshaped_img_coord_x = 200,
-                        # reshaped_img_coord_y = 200,
                         near_zone = True,
                         mod  = 'def',
                         holo_pixel_size = 8e-6,
                         distance= 1,
-                        img_size_for_syn = 512,
 
 )
-img_2 = cv2.imread("C:\\Users\\minik\\Desktop\\timur1.jpg", cv2.IMREAD_GRAYSCALE)
-holo = syntesis(img_2)
+img_2 = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
+holo = syntesis(img_2, position='centre', restored_img_size=200, reshaped_img_position_coord_h_w=(200, 200), control=True)

@@ -31,10 +31,10 @@ class DE_syntesis(BP_synthesis):
         self.error_list = []
         
         if near_zone:
-            self._first_frenel_factor = None
-            self._second_frenel_factor = None
-            self._first_inv_frenel_factor = None
-            self._second_inv_frenel_factor = None
+            self._first_fresnel_factor = None
+            self._second_fresnel_factor = None
+            self._first_inv_fresnel_factor = None
+            self._second_inv_fresnel_factor = None
             self.holo_pixel_size =  holo_pixel_size
             self.scale = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
             self.scale_h = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
@@ -66,9 +66,9 @@ class DE_syntesis(BP_synthesis):
         
     
     @property
-    def first_frenel_factor(self):
-        if self._first_frenel_factor is None and self.near_zone:
-            self._first_frenel_factor = (
+    def first_fresnel_factor(self):
+        if self._first_fresnel_factor is None and self.near_zone:
+            self._first_fresnel_factor = (
                 np.exp(
                     np.array([
                         [
@@ -81,12 +81,12 @@ class DE_syntesis(BP_synthesis):
                 )
             ) 
 
-        return self._first_frenel_factor
+        return self._first_fresnel_factor
 
     @property
-    def second_frenel_factor(self):
-        if self._second_frenel_factor is None and self.near_zone:
-            self._second_frenel_factor = (
+    def second_fresnel_factor(self):
+        if self._second_fresnel_factor is None and self.near_zone:
+            self._second_fresnel_factor = (
                 np.exp(
                     np.array([
                         [
@@ -98,12 +98,12 @@ class DE_syntesis(BP_synthesis):
                     ])
                 )
             )
-        return self._second_frenel_factor
+        return self._second_fresnel_factor
     
     @property
-    def first_inv_frenel_factor(self):
-        if self._first_inv_frenel_factor is None and self.near_zone:
-            self._first_inv_frenel_factor = np.exp(
+    def first_inv_fresnel_factor(self):
+        if self._first_inv_fresnel_factor is None and self.near_zone:
+            self._first_inv_fresnel_factor = np.exp(
                 np.array([
                     [
                         -1j * np.pi * ((i- int(self.holo_size / 2 ))**2 /(self.scale_h_inverse * self.holo_size)  
@@ -113,15 +113,15 @@ class DE_syntesis(BP_synthesis):
                     for i in range(self.holo_size)
                 ])
             )
-            plt.imshow(np.angle(self._first_inv_frenel_factor))
+            plt.imshow(np.angle(self._first_inv_fresnel_factor))
             plt.show()
             
-        return self._first_inv_frenel_factor
+        return self._first_inv_fresnel_factor
 
     @property
-    def second_inv_frenel_factor(self):
-        if self._second_inv_frenel_factor is None and self.near_zone:
-            self._second_inv_frenel_factor = np.exp(
+    def second_inv_fresnel_factor(self):
+        if self._second_inv_fresnel_factor is None and self.near_zone:
+            self._second_inv_fresnel_factor = np.exp(
                 np.array([
                     [
                         -1j * np.pi * (self.scale_h_inverse *(i - int(self.holo_size / 2))**2 /(self.holo_size) 
@@ -133,15 +133,15 @@ class DE_syntesis(BP_synthesis):
             )
             
 
-        return self._second_inv_frenel_factor
+        return self._second_inv_fresnel_factor
     
-    def frenel_transform(self,input_matrix):
-        fourier = np.fft.ifftshift(np.fft.fft2(np.fft.fftshift(input_matrix * self.first_frenel_factor)))
-        return  self.second_frenel_factor * fourier
+    def fresnel_transform(self,input_matrix):
+        fourier = np.fft.ifftshift(np.fft.fft2(np.fft.fftshift(input_matrix * self.first_fresnel_factor)))
+        return  self.second_fresnel_factor * fourier
     
-    def inverse_frenel_transform(self,input_matrix):
-        inv_fourier = np.fft.ifftshift(np.fft.ifft2(np.fft.ifftshift(input_matrix * self.first_inv_frenel_factor)))
-        return self.second_inv_frenel_factor * inv_fourier
+    def inverse_fresnel_transform(self,input_matrix):
+        inv_fourier = np.fft.ifftshift(np.fft.ifft2(np.fft.ifftshift(input_matrix * self.first_inv_fresnel_factor)))
+        return self.second_inv_fresnel_factor * inv_fourier
     
     def fourier_transform(self,input_matrix):
         return np.fft.ifftshift(np.fft.fft2(np.fft.ifftshift(input_matrix)))
@@ -158,7 +158,7 @@ class DE_syntesis(BP_synthesis):
     # central_point_y + 10
     def img_recovery(self, holo):
         if self.near_zone:
-            rec_img = abs(self.inverse_frenel_transform(self.prepare_for_transform(holo)))
+            rec_img = abs(self.inverse_fresnel_transform(self.prepare_for_transform(holo)))
             rec_img = self.del_central_zone(rec_img)
             
         else:
@@ -251,7 +251,7 @@ class DE_syntesis(BP_synthesis):
         img = self.reshape_img_for_syn(input_matrix)
         img  = self.phase_mask(img)
         if self.near_zone:
-            holo = self.frenel_transform(img)
+            holo = self.fresnel_transform(img)
         else :
             holo = self.fourier_transform(img)
 
@@ -267,11 +267,9 @@ class DE_syntesis(BP_synthesis):
         dbphase_holo = np.uint8(dbphase_holo * 255 /(2 * np.pi))
         # до этого момента все отрабатывает нормально 
        
-
-
         # часть, которая восстанавливает, чтобы проверить 
-        a = self.inverse_frenel_transform(self.prepare_for_transform(dbphase_holo))
-        # a = self.inverse_frenel_transform(dbphase_holo)
+        a = self.inverse_fresnel_transform(self.prepare_for_transform(dbphase_holo))
+        # a = self.inverse_fresnel_transform(dbphase_holo)
         # a = self.del_central_zone(a)
 
         plt.plot(abs(a))

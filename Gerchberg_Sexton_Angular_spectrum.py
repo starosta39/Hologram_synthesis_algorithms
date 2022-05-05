@@ -151,8 +151,8 @@ class AS_synthesis(object):
     
     def prepare_for_angle_spec_transform (self, input_matrix):
         return np.exp(1j * input_matrix * 2 * np.pi / 256)
-        
-
+               
+               
     def img_recovery(self, holo, position, reshaped_img_position_coord_h_w):
         if self.holo_type == "phase":
             rec_img = abs(self.angle_spect_transform(self.prepare_for_angle_spec_transform(holo)))
@@ -196,7 +196,7 @@ class AS_synthesis(object):
                     control=False,
                     position=None, 
                     restored_img_size=None,
-                     reshaped_img_position_coord_h_w = (None,None)
+                    reshaped_img_position_coord_h_w = (None,None)
                 ):
         self.reshaped_img_coord_h, self.reshaped_img_coord_w =  reshaped_img_position_coord_h_w
         error_list = []

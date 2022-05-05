@@ -28,34 +28,36 @@ class BP_synthesis(object):
         self.error_list = []
         
         if near_zone:
-            self._first_frenel_factor = None
-            self._second_frenel_factor = None
-            self._first_inv_frenel_factor = None
-            self._second_inv_frenel_factor = None
+            self._first_fresnel_factor = None
+            self._second_fresnel_factor = None
+            self._first_inv_fresnel_factor = None
+            self._second_inv_fresnel_factor = None
             self.holo_pixel_size =  holo_pixel_size
             self.scale = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
         
+            
+            
+    def reshape_img_for_syn(self, input_matrix, restored_img_size, reshaped_img_position_coord_h_w):
+
         if restored_img_size  is None:
             self.restored_img_size =  int(self.holo_size / 2)
         else: self.restored_img_size = restored_img_size
-            
-            
-    def reshape_img_for_syn(self, input_matrix):
+
         new_img = np.zeros((self.holo_size, self.holo_size)) 
         reshape_img = cv2.resize(input_matrix, (self.restored_img_size,self.restored_img_size))
         self.reshape_img = reshape_img
         new_img[
-                self.reshaped_img_coord_h:self.reshaped_img_coord_h + self.restored_img_size, 
-                self.reshaped_img_coord_w:self.reshaped_img_coord_w + self.restored_img_size
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w[0] + self.restored_img_size, 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size
                 ] = reshape_img
         self.new_img = new_img 
         return new_img  
         
     
     @property
-    def first_frenel_factor(self):
-        if self._first_frenel_factor is None and self.near_zone:
-            self._first_frenel_factor = (
+    def first_fresnel_factor(self):
+        if self._first_fresnel_factor is None and self.near_zone:
+            self._first_fresnel_factor = (
                 np.exp(
                     np.array([
                         [
@@ -67,12 +69,12 @@ class BP_synthesis(object):
                 )
             ) 
 
-        return self._first_frenel_factor
+        return self._first_fresnel_factor
 
     @property
-    def second_frenel_factor(self):
-        if self._second_frenel_factor is None and self.near_zone:
-            self._second_frenel_factor = (
+    def second_fresnel_factor(self):
+        if self._second_fresnel_factor is None and self.near_zone:
+            self._second_fresnel_factor = (
                 np.exp(
                     np.array([
                         [
@@ -83,12 +85,12 @@ class BP_synthesis(object):
                     ])
                 )
             )
-        return self._second_frenel_factor
+        return self._second_fresnel_factor
     
     @property
-    def first_inv_frenel_factor(self):
-        if self._first_inv_frenel_factor is None and self.near_zone:
-            self._first_inv_frenel_factor = np.exp(
+    def first_inv_fresnel_factor(self):
+        if self._first_inv_fresnel_factor is None and self.near_zone:
+            self._first_inv_fresnel_factor = np.exp(
                 np.array([
                     [
                         -1j * np.pi * ((i- int(self.holo_size / 2))**2 + (j - int(self.holo_size / 2))**2)/(self.scale * self.holo_size)
@@ -97,12 +99,12 @@ class BP_synthesis(object):
                     for i in range(self.holo_size)
                 ])
             )
-        return self._first_inv_frenel_factor
+        return self._first_inv_fresnel_factor
 
     @property
-    def second_inv_frenel_factor(self):
-        if self._second_inv_frenel_factor is None and self.near_zone:
-            self._second_inv_frenel_factor = np.exp(
+    def second_inv_fresnel_factor(self):
+        if self._second_inv_fresnel_factor is None and self.near_zone:
+            self._second_inv_fresnel_factor = np.exp(
                 np.array([
                     [
                         -1j * np.pi * self.scale *  ((i - int(self.holo_size / 2))**2 + (j - int(self.holo_size / 2))**2) / (self.holo_size)
@@ -113,15 +115,15 @@ class BP_synthesis(object):
             )
             
 
-        return self._second_inv_frenel_factor
+        return self._second_inv_fresnel_factor
     
-    def frenel_transform(self,input_matrix):
-        fourier = np.fft.ifftshift(np.fft.fft2(np.fft.fftshift(input_matrix * self.first_frenel_factor)))
-        return  self.second_frenel_factor * fourier
+    def fresnel_transform(self,input_matrix):
+        fourier = np.fft.ifftshift(np.fft.fft2(np.fft.fftshift(input_matrix * self.first_fresnel_factor)))
+        return  self.second_fresnel_factor * fourier
     
-    def inverse_frenel_transform(self,input_matrix):
-        inv_fourier = np.fft.ifftshift(np.fft.ifft2(np.fft.ifftshift(input_matrix * self.first_inv_frenel_factor)))
-        return self.second_inv_frenel_factor * inv_fourier
+    def inverse_fresnel_transform(self,input_matrix):
+        inv_fourier = np.fft.ifftshift(np.fft.ifft2(np.fft.ifftshift(input_matrix * self.first_inv_fresnel_factor)))
+        return self.second_inv_fresnel_factor * inv_fourier
     
     def fourier_transform(self,input_matrix):
         return np.fft.ifftshift(np.fft.fft2(np.fft.ifftshift(input_matrix)))
@@ -136,21 +138,24 @@ class BP_synthesis(object):
         ] = 0
         return input_matrix
     
-    def informative_zone (self, input_matrix):
+    def informative_zone (self, input_matrix, restored_img_size, reshaped_img_position_coord_h_w):
         res = input_matrix[
-                self.reshaped_img_coord_h:self.reshaped_img_coord_h + self.restored_img_size, 
-                self.reshaped_img_coord_w:self.reshaped_img_coord_w + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w[0] + restored_img_size, 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + restored_img_size,
                 ]
         return res
 
-    def img_recovery(self, holo):
+    def img_recovery(self, holo,restored_img_size, reshaped_img_position_coord_h_w ):
         if self.near_zone:
             if self.holo_type == "phase":
-                rec_img = abs(self.inverse_frenel_transform(self.prepare_for_transform(holo)))
+                rec_img = abs(self.inverse_fresnel_transform(self.prepare_for_transform(holo)))
             elif self.holo_type == "amplitude":
-                rec_img = abs(self.inverse_frenel_transform(holo))
+                rec_img = abs(self.inverse_fresnel_transform(holo))
+            else: 
+                print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)
             rec_img = rec_img**2
             rec_img = self.del_central_zone(rec_img)
+
             plt.plot(rec_img)
             plt.show()
             plt.imshow(rec_img, cmap = 'gray')
@@ -160,13 +165,15 @@ class BP_synthesis(object):
                 rec_img = abs(self.fourier_transform(self.prepare_for_transform(holo)))
             elif self.holo_type == "amplitude":
                 rec_img = abs(self.fourier_transform(holo))
+            else: 
+                print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)
             rec_img = self.del_central_zone(rec_img)
             plt.plot(rec_img)
             plt.show()
             plt.imshow(rec_img, cmap = 'gray')
             plt.show()
         self.recovery_img  = rec_img   
-        self.informative_img_zone = self.informative_zone(rec_img )
+        self.informative_img_zone = self.informative_zone(rec_img ,restored_img_size, reshaped_img_position_coord_h_w)
     
     
     def matrix_normalization(self, input_matrix):
@@ -199,24 +206,35 @@ class BP_synthesis(object):
         mask = np.int8(np.random.rand(self.holo_size,self.holo_size) * 2)       
         return input_matrix * np.exp(1j * np.pi * mask)    
     
-    def __call__(self, input_matrix, reshaped_img_coord_h_w = (None,None), control=False):
+    def __call__(
+                    self, 
+                    input_matrix,
+                    control=False,
+                    restored_img_size=None,
+                    reshaped_img_position_coord_h_w = (None,None)
+                ):
         start_time = time.time()
         error = None
-        self.reshaped_img_coord_h,self.reshaped_img_coord_w = reshaped_img_coord_h_w
-        img = self.reshape_img_for_syn(input_matrix)
-            
+        self.reshaped_img_coord_h,self.reshaped_img_coord_w = reshaped_img_position_coord_h_w
+        img = self.reshape_img_for_syn(input_matrix, restored_img_size, reshaped_img_position_coord_h_w)
+
+        if control:
+           plt.imshow(img, cmap='gray') 
+           plt.show()
+
         if self.rand_phase_mask:
             img  = self.phase_mask(img)
         if self.near_zone:
-            holo = self.frenel_transform(img)
+            holo = self.fresnel_transform(img)
         else :
             holo = self.fourier_transform(img)
+
         holo = 2 * (np.real(holo) - np.real(holo).min())
         holo = np.uint8(holo * 255 /holo.max())
         if self.dynamic_range == "bin":
             holo = cv2.threshold(holo, 0, 127,  cv2.THRESH_OTSU)[1]
         if control:
-            self.img_recovery(holo)
+            self.img_recovery(holo, restored_img_size, reshaped_img_position_coord_h_w)
             error = self.calc_error(self.informative_img_zone, self.reshape_img)
         print("Error ", error)  
         self.error_list.append(error)
@@ -226,21 +244,17 @@ class BP_synthesis(object):
             
 
 transform = BP_synthesis(
-del_area = 100,
+del_area = 1,
 wavelength = 532e-9,
 holo_size = 1024,
-restored_img_size = 256,
 near_zone = True,
-holo_type = "phase",
+holo_type = "amplitude",
 dynamic_range = 'bin',
 rand_phase_mask  = True,
-distance = 0.9,
+distance = 0.5,
 holo_pixel_size = 8e-6   
 )
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(img, reshaped_img_coord_h_w = (200,200),  control=True)
+holo = transform(img, restored_img_size = 256, reshaped_img_position_coord_h_w = (200,200),  control=True)
 plt.imshow(holo, cmap = "gray")
 plt.show()
-print(holo)
-print(holo.max())
-print(holo.min())

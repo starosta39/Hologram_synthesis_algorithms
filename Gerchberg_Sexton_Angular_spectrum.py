@@ -29,26 +29,31 @@ class AS_synthesis(object):
         self.error = error
         self.iter_limit = iter_limit 
         self.error_lists = []
-        self.scale = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)       
+        self.scale_h = self.wavelength * self.distance / ( self.holo_size[0] * self.holo_pixel_size[0]**2)
+        self.scale_w = self.wavelength * self.distance / ( self.holo_size[1] * self.holo_pixel_size[1]**2)           
                             
     def reshape_img_for_syn(self, input_matrix, position, restored_img_size, reshaped_img_position_coord_h_w ):
 
         if restored_img_size  is None:
-            self.restored_img_size = int(self.holo_size / 2 )
+            print("Incorre input, the argument 'restored_img_size' must't be None" ) 
+            exit()
         else: self.restored_img_size = restored_img_size
         
-        new_img = np.zeros((self.holo_size, self.holo_size))
-        reshape_img = cv2.resize(input_matrix, (self.restored_img_size,self.restored_img_size))
+        new_img = np.zeros(self.holo_size)
+        reshape_img = cv2.resize(input_matrix, (self.restored_img_size[1],self.restored_img_size[0]))
+
         if position == "centre":
-            index = int((self.holo_size - self.restored_img_size) / 2)
-            new_img[index:index + self.restored_img_size, index:index + self.restored_img_size] = reshape_img
+            index = (int((self.holo_size[0] - self.restored_img_size[0]) / 2), int((self.holo_size[1] - self.restored_img_size[1]) / 2))
+            new_img[index[0]:index[0] + self.restored_img_size[0], index[1]:index[1] + self.restored_img_size[1]] = reshape_img
         elif position == "free":
             new_img[
-                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size, 
-                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size[0], 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size[1],
                 ] = reshape_img
         else:
             print("Incorre input, the argument 'position' must be equal center/free, but not ", position)
+            exit()
+            
         self.reshape_img = reshape_img
         self.new_img = new_img
         return new_img
@@ -56,19 +61,20 @@ class AS_synthesis(object):
     def informative_zone (self,input_matrix, position, reshaped_img_position_coord_h_w):
 
         if position == "centre":
-            index = int((self.holo_size - self.restored_img_size) / 2)
-            res  = input_matrix[index:index + self.restored_img_size, index:index + self.restored_img_size]
+            index = (int((self.holo_size[0] - self.restored_img_size[0]) / 2), int((self.holo_size[1] - self.restored_img_size[1]) / 2))
+            res = input_matrix[index[0]:index[0] + self.restored_img_size[0], index[1]:index[1] + self.restored_img_size[1]]
         elif position == "free":
             res = input_matrix[
-                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w[0] + self.restored_img_size, 
-                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w[0] + self.restored_img_size[0], 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size[1],
                 ]
         else:
             print("Incorre input, the argument 'position' must be equal center/free, but not ", position)
+            exit()
         return res
 
     def del_central_zone(self,input_matrix):
-        central_point = int(self.holo_size / 2)
+        central_point = (int(self.holo_size[0] / 2),int(self.holo_size[1] / 2))
         input_matrix[central_point - 1:central_point + 1, central_point - 1:central_point + 1] = 0
         return input_matrix       
 
@@ -94,10 +100,11 @@ class AS_synthesis(object):
                 np.exp(
                     np.array([
                         [
-                            1j * np.pi * self.scale * ((i- int(self.holo_size/ 2))**2 + (j - int(self.holo_size/ 2))**2) / self.holo_size
-                            for j in range(self.holo_size)
+                            1j * np.pi * (self.scale_h * (i- int(self.holo_size[0] / 2))**2 / self.holo_size[0]
+                            + self.scale_w * (j - int(self.holo_size[1] / 2))**2 / self.holo_size[1])
+                            for j in range(self.holo_size[1])
                         ]
-                        for i in range(self.holo_size)
+                        for i in range(self.holo_size[0])
                     ])
                 )
             ) 
@@ -144,9 +151,9 @@ class AS_synthesis(object):
       
     def initial_approx(self):
         if self.holo_type == "phase":
-            return np.exp(1j * np.random.rand(self.holo_size, self.holo_size))
+            return np.exp(1j * np.random.rand(self.holo_size[0], self.holo_size[1]))
         elif self.holo_type == "amplitude":
-            return  np.random.rand(self.holo_size, self.holo_size)  
+            return  np.random.rand(self.holo_size[0], self.holo_size[1])  
 
     
     def prepare_for_angle_spec_transform (self, input_matrix):
@@ -160,6 +167,7 @@ class AS_synthesis(object):
             rec_img = abs(self.angle_spect_transform(holo))
         else: 
             print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)
+            exit()
 
         rec_img  = rec_img**2   
         self.rec_img = rec_img
@@ -235,20 +243,25 @@ class AS_synthesis(object):
         return holo
 
 transform = AS_synthesis(
-    holo_pixel_size = 8e-6,
+    holo_pixel_size = (8e-6,8e-6),
     distance = 0.1,
     wavelength = 532e-9,
-    holo_size = 1024,
+    holo_size = (1024,1024),
     error = 1e-9,
     iter_limit = 20,
-    holo_type = "amplitude",
+    holo_type = "phase",
     dynamic_range = 'gray'
 )
 
 
 
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(img, position='free', reshaped_img_position_coord_h_w = (100,100), restored_img_size=200,  control=True )
+holo = transform(
+                    img, 
+                    position='centre', 
+                    reshaped_img_position_coord_h_w = (100,100),
+                    restored_img_size=(int(img.shape[0] / 3), int(img.shape[1] / 3)),
+                    control=True )
 cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
 
 

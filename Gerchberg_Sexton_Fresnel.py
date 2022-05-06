@@ -27,31 +27,30 @@ class GS_Fresnel_synthesis(object):
         self.holo_size = holo_size 
         self.error_dif= error_dif
         self.iter_limit = iter_limit 
-        self.error_lists = []
-        self.img_pixel_size = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size)
-        self.scale = self.img_pixel_size / self.holo_pixel_size
-            
+        self.error_lists = [] 
+        self.scale_h = self.wavelength * self.distance / ( self.holo_size[0] * self.holo_pixel_size[0]**2)
+        self.scale_w = self.wavelength * self.distance / ( self.holo_size[1] * self.holo_pixel_size[1]**2)    
                 
     def reshape_img_for_syn(self, input_matrix, position, restored_img_size, reshaped_img_position_coord_h_w ):
-
         if restored_img_size  is None:
-            self.restored_img_size = int(self.holo_size/2)
+            print("Incorre input, the argument 'restored_img_size' must't be None" ) 
+            exit()
         else:
              self.restored_img_size = restored_img_size
-
-        new_img = np.zeros((self.holo_size, self.holo_size))
-        reshape_img = cv2.resize(input_matrix, (self.restored_img_size,self.restored_img_size))
+        new_img = np.zeros(self.holo_size)
+        reshape_img = cv2.resize(input_matrix, (self.restored_img_size[1],self.restored_img_size[0]))
 
         if position == "centre":
-            index = int((self.holo_size - self.restored_img_size) / 2)
-            new_img[index:index + self.restored_img_size, index:index + self.restored_img_size] = reshape_img
+            index = (int((self.holo_size[0] - self.restored_img_size[0]) / 2), int((self.holo_size[1] - self.restored_img_size[1]) / 2))
+            new_img[index[0]:index[0] + self.restored_img_size[0], index[1]:index[1] + self.restored_img_size[1]] = reshape_img
         elif position == "free":
             new_img[
-                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size, 
-                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size[0], 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size[1],
                 ] = reshape_img
         else:
             print("Incorre input, the argument 'position' must be equal center/free, but not ", position)
+            exit()
             
         self.reshape_img = reshape_img
         self.new_img = new_img
@@ -60,15 +59,16 @@ class GS_Fresnel_synthesis(object):
     def informative_zone (self,input_matrix, position, reshaped_img_position_coord_h_w):
 
         if position == "centre":
-            index = int((self.holo_size - self.restored_img_size) / 2)
-            res  = input_matrix[index:index + self.restored_img_size, index:index + self.restored_img_size]
+            index = (int((self.holo_size[0] - self.restored_img_size[0]) / 2), int((self.holo_size[1] - self.restored_img_size[1]) / 2))
+            res = input_matrix[index[0]:index[0] + self.restored_img_size[0], index[1]:index[1] + self.restored_img_size[1]]
         elif position == "free":
             res = input_matrix[
-                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w[0] + self.restored_img_size, 
-                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w[0] + self.restored_img_size[0], 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size[1],
                 ]
         else:
             print("Incorre input, the argument 'position' must be equal center/free, but not ", position)
+            exit()
         return res
         
     # function for translating an argument from a range [0 2*pi) to  (-pi,pi]
@@ -98,13 +98,14 @@ class GS_Fresnel_synthesis(object):
                 np.exp(
                     np.array([
                         [
-                            1j * np.pi * self.scale * ((i- int(self.holo_size / 2))**2 + (j - int(self.holo_size / 2))**2) / self.holo_size
-                            for j in range(self.holo_size)
+                            1j * np.pi * (self.scale_h * (i- int(self.holo_size[0] / 2))**2 / self.holo_size[0] 
+                            + self.scale_w * (j - int(self.holo_size[1] / 2))**2 / self.holo_size[1])
+                            for j in range(self.holo_size[1])
                         ]
-                        for i in range(self.holo_size)
+                        for i in range(self.holo_size[0])
                     ])
-                )
-            ) 
+                ) 
+            )
         return self._first_fresnel_factor
 
     @property
@@ -114,12 +115,13 @@ class GS_Fresnel_synthesis(object):
                 np.exp(
                     np.array([
                         [
-                            1j * np.pi * ((i- int(self.holo_size / 2))**2 + (j - int(self.holo_size / 2))**2) / (self.holo_size * self.scale)
-                                   for j in range(self.holo_size)
-                        ] 
-                        for i in range(self.holo_size)
+                            1j * np.pi * ((i- int(self.holo_size[0] / 2))**2 /( self.holo_size[0] * self.scale_h) 
+                            + (j - int(self.holo_size[1] / 2))**2 / (self.holo_size[1] * self.scale_w))
+                            for j in range(self.holo_size[1])          
+                        ]
+                        for i in range(self.holo_size[0])
                     ])
-                )
+                ) 
             )
         return self._second_fresnel_factor
       
@@ -127,14 +129,15 @@ class GS_Fresnel_synthesis(object):
     def first_inv_fresnel_factor(self):
         if self._first_inv_fresnel_factor is None:
             self._first_inv_fresnel_factor = np.exp(
-                np.array([
-                    [
-                        -1j * np.pi * ((i- int(self.holo_size / 2))**2 + (j - int(self.holo_size / 2))**2)/(self.scale * self.holo_size)
-                        for j in range(self.holo_size)
-                    ]
-                    for i in range(self.holo_size)
-                ])
-            )
+                 np.array([
+                        [
+                            -1j * np.pi * ((i- int(self.holo_size[0] / 2))**2 /( self.holo_size[0] * self.scale_h) 
+                            + (j - int(self.holo_size[1] / 2))**2 / (self.holo_size[1] * self.scale_w))
+                            for j in range(self.holo_size[1])          
+                        ]
+                        for i in range(self.holo_size[0])
+                    ])
+                )
         return self._first_inv_fresnel_factor
 
     @property
@@ -142,13 +145,14 @@ class GS_Fresnel_synthesis(object):
         if self._second_inv_fresnel_factor is None:
             self._second_inv_fresnel_factor = np.exp(
                 np.array([
-                    [
-                        -1j * np.pi * self.scale *  ((i - int(self.holo_size / 2))**2 + (j - int(self.holo_size / 2))**2) / (self.holo_size)
-                        for j in range(self.holo_size)
-                    ]
-                    for i in range(self.holo_size)
-                ])
-            )
+                        [
+                            -1j * np.pi * (self.scale_h * (i- int(self.holo_size[0] / 2))**2 / self.holo_size[0] 
+                            + self.scale_w * (j - int(self.holo_size[1] / 2))**2 / self.holo_size[1])
+                            for j in range(self.holo_size[1])
+                        ]
+                        for i in range(self.holo_size[0])
+                    ])
+                ) 
         return self._second_inv_fresnel_factor
 
     def zero_to_two_pi_range(self, phase): 
@@ -164,8 +168,11 @@ class GS_Fresnel_synthesis(object):
     
     
     def initial_approx(self):
-        return np.exp(1j * np.random.rand(self.holo_size, self.holo_size))
-    
+        if self.holo_type == "phase":
+            return np.exp(1j * np.random.rand(self.holo_size[0], self.holo_size[1]))
+        elif self.holo_type == "amplitude":
+            return  np.random.rand(self.holo_size[0], self.holo_size[1])  
+
     def prepare_for_fresnel (self, input_matrix):
         return np.exp(1j * input_matrix * 2 * np.pi / 256)
 
@@ -184,6 +191,7 @@ class GS_Fresnel_synthesis(object):
             rec_img = abs(self.fresnel_transform(holo))
         else: 
             print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)
+            exit()
 
         rec_img  = rec_img**2   
         self.rec_img = rec_img
@@ -248,19 +256,24 @@ class GS_Fresnel_synthesis(object):
         return holo
 
 transform = GS_Fresnel_synthesis(
-    holo_pixel_size = 8e-6,
+    holo_pixel_size = (8e-6, 8e-6),
     distance = 0.1,
     wavelength = 532e-9,
-    holo_size = 1024,
+    holo_size = (1024,1024),
     error_dif = 1e-4,
-    holo_type = 'phase',
-    dynamic_range = "gray",
+    holo_type = 'amplitude',
+    dynamic_range = "bin",
     iter_limit = 20,
     
 )
 
 img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(img, position='free', reshaped_img_position_coord_h_w = (100,100), restored_img_size=200,  control=False)
+holo = transform(
+                    img, 
+                    position='free', 
+                    reshaped_img_position_coord_h_w = (100,100), 
+                    restored_img_size = (int(img.shape[0] / 3), int(img.shape[1] / 3)),
+                    control=True)
 cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
 #  # print(holo)
 plt.imshow(holo, cmap = 'gray')

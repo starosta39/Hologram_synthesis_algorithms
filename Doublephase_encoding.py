@@ -32,103 +32,103 @@ class DE_syntesis(object):
             self._first_inv_fresnel_factor = None
             self._second_inv_fresnel_factor = None
             self.holo_pixel_size =  holo_pixel_size
-            self.scale = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
-            self.scale_h = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
-            self.scale_w = self.wavelength *  self.distance / (self.holo_size  * 4 *   self.holo_pixel_size**2)
-            self.scale_h_inverse = self.wavelength * self.distance / (self.holo_size * self.holo_pixel_size**2)
-            self.scale_w_inverse = self.wavelength * self.distance / (self.holo_size * 2 * self.holo_pixel_size**2)
+            self.scale_h = self.wavelength * self.distance / (self.holo_size[0] * self.holo_pixel_size[0]**2)
+            self.scale_w = self.wavelength *  self.distance / (self.holo_size[1]  * 4 *   self.holo_pixel_size[1]**2)
+            self.scale_h_inverse = self.wavelength * self.distance / (self.holo_size[0] * self.holo_pixel_size[0]**2)
+            self.scale_w_inverse = self.wavelength * self.distance / (self.holo_size[1] * 2 * self.holo_pixel_size[1]**2)
         
             
     def reshape_img_for_syn(self, input_matrix, position, restored_img_size, reshaped_img_position_coord_h_w):
 
         if restored_img_size  is None:
-            self.restored_img_size = int(self.holo_size / 2 )
+            print("Incorre input, the argument 'restored_img_size' must't be None" ) 
+            exit()
         else: self.restored_img_size = restored_img_size
-        
-        new_img = np.zeros((self.holo_size, self.holo_size)) 
-        reshape_img = cv2.resize(input_matrix, (self.restored_img_size, self.restored_img_size))
+
+        new_img = np.zeros(self.holo_size) 
+        reshape_img = cv2.resize(input_matrix, (self.restored_img_size[1], self.restored_img_size[0]))
         self.reshape_img = reshape_img
 
         if position == "centre":
-            index = int((self.holo_size - self.restored_img_size) / 2)
-            new_img[index:index + self.restored_img_size, index:index + self.restored_img_size] = reshape_img     
+            index = (int((self.holo_size[0] - self.restored_img_size[0]) / 2), int((self.holo_size[1] - self.restored_img_size[1]) / 2))
+            new_img[index[0]:index[0] + self.restored_img_size[0], index[1]:index[1] + self.restored_img_size[1]] = reshape_img
         elif position == "free":
             new_img[
-                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size, 
-                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size,
+                reshaped_img_position_coord_h_w[0]:reshaped_img_position_coord_h_w [0]+ self.restored_img_size[0], 
+                reshaped_img_position_coord_h_w[1]:reshaped_img_position_coord_h_w[1] + self.restored_img_size[1],
                 ] = reshape_img
         else:
-            print("Incorre input, the argument 'position' must be equal center/free, but not ", position)           
-        self.new_img = new_img 
+            print("Incorre input, the argument 'position' must be equal center/free, but not ", position)
+            exit()
+            
+        self.reshape_img = reshape_img
+        self.new_img = new_img
         return new_img
+
         
     
     @property
     def first_fresnel_factor(self):
-        if self._first_fresnel_factor is None and self.near_zone:
+        if self._first_fresnel_factor is None:
             self._first_fresnel_factor = (
                 np.exp(
                     np.array([
                         [
-                            1j * np.pi * (self.scale_h * ((i- int(self.holo_size / 2))**2 + 
-                            self.scale_w * (j - int(self.holo_size / 2))**2)) / self.holo_size
-                            for j in range(self.holo_size)
+                            1j * np.pi * (self.scale_h * (i- int(self.holo_size[0] / 2))**2 / self.holo_size[0] 
+                            + self.scale_w * (j - int(self.holo_size[1] / 2))**2 / self.holo_size[1])
+                            for j in range(self.holo_size[1])
                         ]
-                        for i in range(self.holo_size)
+                        for i in range(self.holo_size[0])
                     ])
-                )
-            ) 
-
+                ) 
+            )
         return self._first_fresnel_factor
 
     @property
     def second_fresnel_factor(self):
-        if self._second_fresnel_factor is None and self.near_zone:
+        if self._second_fresnel_factor is None:
             self._second_fresnel_factor = (
                 np.exp(
                     np.array([
                         [
-                            1j * np.pi * ((i- int(self.holo_size / 2))**2 / self.scale_h + 
-                            (j - int(self.holo_size / 2))**2 / self.scale_w) / (self.holo_size)
-                                   for j in range(self.holo_size)
-                        ] 
-                        for i in range(self.holo_size)
+                            1j * np.pi * ((i- int(self.holo_size[0] / 2))**2 /( self.holo_size[0] * self.scale_h) 
+                            + (j - int(self.holo_size[1] / 2))**2 / (self.holo_size[1] * self.scale_w))
+                            for j in range(self.holo_size[1])          
+                        ]
+                        for i in range(self.holo_size[0])
                     ])
-                )
+                ) 
             )
         return self._second_fresnel_factor
-    
+      
     @property
     def first_inv_fresnel_factor(self):
-        if self._first_inv_fresnel_factor is None and self.near_zone:
+        if self._first_inv_fresnel_factor is None:
             self._first_inv_fresnel_factor = np.exp(
-                np.array([
-                    [
-                        -1j * np.pi * ((i- int(self.holo_size / 2 ))**2 /(self.scale_h_inverse * self.holo_size)  
-                        + (j - int(self.holo_size))**2 /(self.scale_w_inverse * self.holo_size * 2))
-                        for j in range(self.holo_size * 2)
-                    ]
-                    for i in range(self.holo_size)
-                ])
-            )
-            
+                 np.array([
+                        [
+                            -1j * np.pi * ((i- int(self.holo_size[0] / 2))**2 /( self.holo_size[0] * self.scale_h_inverse) 
+                            + (j - int(self.holo_size[1]))**2 / (self.holo_size[1] * 2 * self.scale_w_inverse))
+                            for j in range(self.holo_size[1] * 2)          
+                        ]
+                        for i in range(self.holo_size[0])
+                    ])
+                )
         return self._first_inv_fresnel_factor
 
     @property
     def second_inv_fresnel_factor(self):
-        if self._second_inv_fresnel_factor is None and self.near_zone:
+        if self._second_inv_fresnel_factor is None:
             self._second_inv_fresnel_factor = np.exp(
                 np.array([
-                    [
-                        -1j * np.pi * (self.scale_h_inverse *(i - int(self.holo_size / 2))**2 /(self.holo_size) 
-                        + self.scale_w_inverse * (j - int(self.holo_size ))**2 / (self.holo_size * 2)) 
-                        for j in range(self.holo_size * 2)
-                    ]
-                    for i in range(self.holo_size)
-                ])
-            )
-            
-
+                        [
+                            -1j * np.pi * (self.scale_h_inverse * (i- int(self.holo_size[0] / 2))**2 / self.holo_size[0] 
+                            + self.scale_w_inverse * (j - int(self.holo_size[1]))**2 / (self.holo_size[1] * 2))
+                            for j in range(self.holo_size[1] * 2)
+                        ]
+                        for i in range(self.holo_size[0])
+                    ])
+                ) 
         return self._second_inv_fresnel_factor
     
     def fresnel_transform(self,input_matrix):
@@ -189,7 +189,7 @@ class DE_syntesis(object):
         return np.sqrt(1-(ab*ab)/(a*b))
        
     def phase_mask(self, input_matrix):
-        mask = np.int8(np.random.rand(self.holo_size,self.holo_size) * 2)       
+        mask = np.int8(np.random.rand(self.holo_size[0],self.holo_size[1]) * 2)       
         return input_matrix * np.exp(1j * np.pi * mask)   
 
     def zero_to_two_pi_range(self, angles):
@@ -248,7 +248,7 @@ class DE_syntesis(object):
         phase = np.angle(holo)
         teta_1 =  phase + del_phi
         teta_2 = phase - del_phi 
-        dbphase_holo = self.generate_doubph_enc_matrix(teta_1, teta_2, (self.holo_size, self.holo_size * 2), self.mod )
+        dbphase_holo = self.generate_doubph_enc_matrix(teta_1, teta_2, (self.holo_size[0], self.holo_size[1] * 2), self.mod )
         dbphase_holo = self.matrix_normalization(dbphase_holo)
         # до этого момента все отрабатывает нормально 
         if control:
@@ -284,12 +284,12 @@ class DE_syntesis(object):
 syntesis = DE_syntesis(
                         del_area = 1,
                         wavelength = 532e-9,
-                        holo_size = 1024,
+                        holo_size = (1024,1024),
                         near_zone = True,
                         mod  = 'def',
-                        holo_pixel_size = 8e-6,
+                        holo_pixel_size = (8e-6,8e-6),
                         distance= 1,
 
 )
 img_2 = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = syntesis(img_2, position='centre', restored_img_size=200, reshaped_img_position_coord_h_w=(200, 200), control=True)
+holo = syntesis(img_2, position='centre', restored_img_size=(200,200), reshaped_img_position_coord_h_w=(200, 200), control=True)

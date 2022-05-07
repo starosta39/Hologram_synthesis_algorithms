@@ -13,7 +13,7 @@ class BP_synthesis(object):
                  dynamic_range,
                  near_zone = True,
                  distance = None,
-                 holo_pixel_size = None
+                 holo_pixel_size = None,
                 ):
         self.rand_phase_mask = rand_phase_mask
         self.dynamic_range = dynamic_range
@@ -134,11 +134,14 @@ class BP_synthesis(object):
         return np.fft.ifftshift(np.fft.ifft2(np.fft.ifftshift(input_matrix)))
     
     def del_central_zone(self,input_matrix):
-        central_point = (int(self.holo_size[0] / 2),int(self.holo_size[1] / 2))
-        input_matrix[
-            central_point[0] - self.del_area:central_point[0] + self.del_area, central_point[1] - self.del_area:central_point[1] + self.del_area
-        ] = 0
-        return input_matrix
+        if self.del_area > 0: 
+            central_point = (int(self.holo_size[0] / 2), int(self.holo_size[1] / 2))
+            input_matrix[
+                central_point[0] - self.del_area:central_point[0] + self.del_area, central_point[1] - self.del_area:central_point[1] + self.del_area
+            ] = 0
+            return input_matrix
+        else: 
+            return input_matrix
     
     def informative_zone (self, input_matrix, restored_img_size, reshaped_img_position_coord_h_w):
         res = input_matrix[
@@ -246,23 +249,23 @@ class BP_synthesis(object):
         return holo
             
 
-transform = BP_synthesis(
-del_area = 80,
-wavelength = 532e-9,
-holo_size = (1024,1024),
-near_zone = False,
-holo_type = "amplitude",
-dynamic_range = 'bin',
-rand_phase_mask  = True,
-distance = 1.5,
-holo_pixel_size = (8e-6,8e-6)   
-)
-img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(
-                    img,
-                    restored_img_size=(int(img.shape[0] / 3), int(img.shape[1] / 3)), 
-                    reshaped_img_position_coord_h_w=(100,100), 
-                    control=True
-                )
-plt.imshow(holo, cmap = "gray")
-plt.show()
+# transform = BP_synthesis(
+# del_area = 80,
+# wavelength = 532e-9,
+# holo_size = (1024,1024),
+# near_zone = False,
+# holo_type = "amplitude",
+# dynamic_range = 'bin',
+# rand_phase_mask  = True,
+# distance = 1.5,
+# holo_pixel_size = (8e-6,8e-6)   
+# )
+# img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
+# holo = transform(
+#                     img,
+#                     restored_img_size=(int(img.shape[0] / 3), int(img.shape[1] / 3)), 
+#                     reshaped_img_position_coord_h_w=(100,100), 
+#                     control=True
+#                 )
+# plt.imshow(holo, cmap = "gray")
+# plt.show()

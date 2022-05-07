@@ -1,13 +1,13 @@
 import numpy as np 
 import cv2
 import matplotlib.pyplot as plt
-import cmath
 import time 
 
 class AS_synthesis(object):
     
     def __init__(
                     self, 
+                    del_area,
                     holo_pixel_size,
                     distance, 
                     wavelength, 
@@ -17,6 +17,7 @@ class AS_synthesis(object):
                     holo_type,
                     dynamic_range,
                 ):
+        self.del_area = del_area
         self.dynamic_range = dynamic_range
         self.holo_type = holo_type
         self.name = 'GS_angular_spectrum'
@@ -74,9 +75,14 @@ class AS_synthesis(object):
         return res
 
     def del_central_zone(self,input_matrix):
-        central_point = (int(self.holo_size[0] / 2),int(self.holo_size[1] / 2))
-        input_matrix[central_point - 1:central_point + 1, central_point - 1:central_point + 1] = 0
-        return input_matrix       
+        if self.del_area > 0: 
+            central_point = (int(self.holo_size[0] / 2), int(self.holo_size[1] / 2))
+            input_matrix[
+                central_point[0] - self.del_area:central_point[0] + self.del_area, central_point[1] - self.del_area:central_point[1] + self.del_area
+            ] = 0
+            return input_matrix
+        else: 
+            return input_matrix    
 
     def matrix_normalization(self, input_matrix):
         if self.holo_type == "phase":
@@ -116,7 +122,7 @@ class AS_synthesis(object):
             self._inv_chirp_factor = np.conj(self.chirp_factor)
         return self._inv_chirp_factor
     
-    def angle_spect_transform(self,input_matrix):
+    def angle_spect_transform(self, input_matrix):
         
         transform = np.fft.ifftshift(
             np.fft.fft2(
@@ -165,6 +171,7 @@ class AS_synthesis(object):
             rec_img = abs(self.angle_spect_transform(self.prepare_for_angle_spec_transform(holo)))
         elif self.holo_type == "amplitude":
             rec_img = abs(self.angle_spect_transform(holo))
+            rec_img = self.del_central_zone(rec_img)
         else: 
             print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)
             exit()
@@ -243,26 +250,27 @@ class AS_synthesis(object):
         return holo
 
 transform = AS_synthesis(
+    del_area = 0,
     holo_pixel_size = (8e-6,8e-6),
     distance = 0.1,
     wavelength = 532e-9,
     holo_size = (1024,1024),
     error = 1e-9,
     iter_limit = 20,
-    holo_type = "phase",
+    holo_type = 'amplitude',
     dynamic_range = 'gray'
 )
 
 
 
-img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(
-                    img, 
-                    position='centre', 
-                    reshaped_img_position_coord_h_w = (100,100),
-                    restored_img_size=(int(img.shape[0] / 3), int(img.shape[1] / 3)),
-                    control=True )
-cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
+# img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
+# holo = transform(
+#                     img, 
+#                     position='centre', 
+#                     reshaped_img_position_coord_h_w = (100,100),
+#                     restored_img_size=(int(img.shape[0] / 3), int(img.shape[1] / 3)),
+#                     control=True )
+# cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
 
 
 

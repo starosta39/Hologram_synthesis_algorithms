@@ -2,7 +2,6 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import time 
-import cmath
 import random
 
 
@@ -281,15 +280,15 @@ class DE_syntesis(object):
         self.holo  =  dbphase_holo
         return dbphase_holo
 
-syntesis = DE_syntesis(
-                        del_area = 1,
-                        wavelength = 532e-9,
-                        holo_size = (1024,1024),
-                        near_zone = True,
-                        mod  = 'def',
-                        holo_pixel_size = (8e-6,8e-6),
-                        distance= 1,
+# syntesis = DE_syntesis(
+#                         del_area = 1,
+#                         wavelength = 532e-9,
+#                         holo_size = (1024,1024),
+#                         near_zone = True,
+#                         mod  = 'def',
+#                         holo_pixel_size = (8e-6,8e-6),
+#                         distance= 1,
 
-)
-img_2 = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = syntesis(img_2, position='centre', restored_img_size=(200,200), reshaped_img_position_coord_h_w=(200, 200), control=True)
+# )
+# img_2 = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
+# holo = syntesis(img_2, position='centre', restored_img_size=(200,200), reshaped_img_position_coord_h_w=(200, 200), control=True)

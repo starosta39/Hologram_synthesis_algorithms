@@ -1,19 +1,19 @@
 import numpy as np 
 import cv2
 import matplotlib.pyplot as plt
-import cmath
 import time 
 class GS_Fresnel_synthesis(object):
     
     def __init__(
-                 self, 
+                 self,  
+                 del_area,
                  holo_pixel_size, 
                  distance, wavelength, 
                  holo_size, error_dif, 
                  iter_limit, holo_type, 
                  dynamic_range,
         ):
-
+        self.del_area = del_area 
         self.dynamic_range = dynamic_range
         self.holo_type = holo_type
         self.name = 'GS_Fresnel'
@@ -175,6 +175,16 @@ class GS_Fresnel_synthesis(object):
 
     def prepare_for_fresnel (self, input_matrix):
         return np.exp(1j * input_matrix * 2 * np.pi / 256)
+    
+    def del_central_zone(self,input_matrix):
+        if self.del_area > 0: 
+            central_point = (int(self.holo_size[0] / 2), int(self.holo_size[1] / 2))
+            input_matrix[
+                central_point[0] - self.del_area:central_point[0] + self.del_area, central_point[1] - self.del_area:central_point[1] + self.del_area
+            ] = 0
+            return input_matrix
+        else: 
+            return input_matrix
 
     def calc_error(self, input_matrix, real_img):
         input_matrix = np.float64(abs(input_matrix))
@@ -189,6 +199,7 @@ class GS_Fresnel_synthesis(object):
             rec_img = abs(self.fresnel_transform(self.prepare_for_fresnel(holo)))
         elif self.holo_type == "amplitude":
             rec_img = abs(self.fresnel_transform(holo))
+            rec_img = self.del_central_zone(rec_img)
         else: 
             print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)
             exit()
@@ -209,7 +220,6 @@ class GS_Fresnel_synthesis(object):
                     position=None, 
                     restored_img_size = None,  
                     reshaped_img_position_coord_h_w = (None,None)
-
                 ):
         self.reshaped_img_coord_h, self.reshaped_img_coord_w = reshaped_img_position_coord_h_w
         error_list = []
@@ -262,8 +272,9 @@ transform = GS_Fresnel_synthesis(
     holo_size = (1024,1024),
     error_dif = 1e-4,
     holo_type = 'amplitude',
-    dynamic_range = "bin",
+    dynamic_range = "gray",
     iter_limit = 20,
+    del_area = 80
     
 )
 
@@ -273,13 +284,14 @@ holo = transform(
                     position='free', 
                     reshaped_img_position_coord_h_w = (100,100), 
                     restored_img_size = (int(img.shape[0] / 3), int(img.shape[1] / 3)),
-                    control=True)
+                    control=True,
+                )
 cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
 #  # print(holo)
 plt.imshow(holo, cmap = 'gray')
 plt.show()
 # holo = cv2.imread("C:\\Users\\minik\\Desktop\\lena_holo.bmp", cv2.IMREAD_GRAYSCALE)
-# plt.imshow((abs(transform.fresnel_transform(holo)))**2, cmap = 'gray')
+plt.imshow((abs(transform.fresnel_transform(holo)))**2, cmap = 'gray')
+plt.show()
+# plt.plot(abs(transform.fresnel_transform(np.exp(1j*holo)))**2)
 # plt.show()
-# # plt.plot(abs(transform.fresnel_transform(np.exp(1j*holo)))**2)
-# # plt.show()

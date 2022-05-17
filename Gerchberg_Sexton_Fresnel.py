@@ -251,7 +251,7 @@ class GS_Fresnel_synthesis(object):
             elif self.holo_type == "amplitude":                
                 holo = abs(holo)
             else: 
-                print("Incorre input, the argument 'holo_type' must be equal phase/bin, but not ", self.holo_type)   
+                print("Incorre input, the argument 'holo_type' must be equal phase/amplitude, but not ", self.holo_type)   
             i += 1 
             error_list.append(error)
             print("Iteration ", i, "error(informative zone)", error) 
@@ -263,35 +263,35 @@ class GS_Fresnel_synthesis(object):
             self.img_recovery(holo,position, reshaped_img_position_coord_h_w)
         self.holo = holo
         print("--- %s seconds ---" % (time.time() - start_time))
-        return holo
+        return holo 
 
-transform = GS_Fresnel_synthesis(
-    holo_pixel_size = (8e-6, 8e-6),
-    distance = 0.1,
-    wavelength = 532e-9,
-    holo_size = (1024,1024),
-    error_dif = 1e-4,
-    holo_type = 'amplitude',
-    dynamic_range = "gray",
-    iter_limit = 20,
-    del_area = 80
+# transform = GS_Fresnel_synthesis(
+#     holo_pixel_size = (8e-6, 8e-6),
+#     distance = 0.1,
+#     wavelength = 532e-9,
+#     holo_size = (1024,1024),
+#     error_dif = 1e-4,
+#     holo_type = 'amplitude',
+#     dynamic_range = "gray",
+#     iter_limit = 20,
+#     del_area = 80
     
-)
+# )
 
-img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
-holo = transform(
-                    img, 
-                    position='free', 
-                    reshaped_img_position_coord_h_w = (100,100), 
-                    restored_img_size = (int(img.shape[0] / 3), int(img.shape[1] / 3)),
-                    control=True,
-                )
-cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
-#  # print(holo)
-plt.imshow(holo, cmap = 'gray')
-plt.show()
-# holo = cv2.imread("C:\\Users\\minik\\Desktop\\lena_holo.bmp", cv2.IMREAD_GRAYSCALE)
-plt.imshow((abs(transform.fresnel_transform(holo)))**2, cmap = 'gray')
-plt.show()
+# img = cv2.imread("C:\\Users\\minik\\Desktop\\lena.jpg", cv2.IMREAD_GRAYSCALE)
+# holo = transform(
+#                     img, 
+#                     position='free', 
+#                     reshaped_img_position_coord_h_w = (100,100), 
+#                     restored_img_size = (int(img.shape[0] / 3), int(img.shape[1] / 3)),
+#                     control=True,
+#                 )
+# cv2.imwrite("C:\\Users\\minik\\Desktop\\lena_holo.bmp", holo)
+# #  # print(holo)
+# plt.imshow(holo, cmap = 'gray')
+# plt.show()
+# # holo = cv2.imread("C:\\Users\\minik\\Desktop\\lena_holo.bmp", cv2.IMREAD_GRAYSCALE)
+# plt.imshow((abs(transform.fresnel_transform(holo)))**2, cmap = 'gray')
+# plt.show()
 # plt.plot(abs(transform.fresnel_transform(np.exp(1j*holo)))**2)
 # plt.show()

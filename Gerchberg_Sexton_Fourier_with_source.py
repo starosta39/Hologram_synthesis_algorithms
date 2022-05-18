@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import time 
 import copy
 from Gerchberg_Sexton_Fresnel import GS_Fresnel_synthesis
+from Direct_search_with_random_trajectory import DSWRT
 
 class GS_Fresnel_ws_synthesis(GS_Fresnel_synthesis):
     def __init__(
@@ -17,8 +18,14 @@ class GS_Fresnel_ws_synthesis(GS_Fresnel_synthesis):
                     iter_limit, 
                     holo_type,
                     dynamic_range,
-                    del_area
+                    del_area,
+                    random_tr = False,
+                    alpha = None,
+                    epochs = None,
                 ):
+        self.random_tr = random_tr
+        self.alpha = alpha 
+        self.epochs = epochs
         self.source_distance = source_distance
         self._source_amplitude = None
         self._source_phase = None
@@ -178,7 +185,9 @@ class GS_Fresnel_ws_synthesis(GS_Fresnel_synthesis):
                                         Ans,
                                         self.informative_zone(img, position, reshaped_img_position_coord_h_w)
                                         )  
-                
+                if i == self.iter_limit - 1:
+                    plt.imshow(Ans, cmap='gray')
+                    plt.show()
                 i += 1 
                 error_list.append(error)
                 print("Iteration ", i, "error(informative zone)", error) 
@@ -188,9 +197,21 @@ class GS_Fresnel_ws_synthesis(GS_Fresnel_synthesis):
             # if control:
             #     self.img_recovery(holo,position, reshaped_img_position_coord_h_w)
             self.holo = holo_final
-            plt.imshow(self.holo, cmap="gray")
-            plt.show()          
-            print("--- %s seconds ---" % (time.time() - start_time))
+            if self.random_tr:
+                search = DSWRT(
+                        perfect_img = self.new_img,
+                        epochs=self.epochs, 
+                        alpha=self.alpha, 
+                        holo_type= self.holo_type,
+                        position= position, 
+                        restored_img_size=restored_img_size, 
+                        source_amplitude = self.source_amplitude,
+                        source_phase=self.source_phase,
+                        holo_size = self.holo_size,
+                        reshaped_img_position_coord_h_w = None,)
+
+                holo_final = search(holo_final)      
+            print("Finish --- %s seconds ---" % (time.time() - start_time))
             return holo_final
 transform = GS_Fresnel_ws_synthesis(
     holo_pixel_size = (8e-6, 8e-6),
@@ -198,11 +219,14 @@ transform = GS_Fresnel_ws_synthesis(
     wavelength = 532e-9,
     holo_size = (256,256),
     error_dif = 1e-4,
-    holo_type = 'amplitude',
-    dynamic_range = 'gray',
-    iter_limit = 100,
+    holo_type = 'phase',
+    dynamic_range = 'bin',
+    iter_limit = 30,
     del_area = 0,
-    source_distance = 0.3
+    source_distance = 0.3,
+    random_tr = True,
+    alpha = 0.8,
+    epochs = 1
 
 )
 img = cv2.imread("C:\\Users\\minik\\Desktop\\cat_64.tif", cv2.IMREAD_GRAYSCALE)
@@ -213,7 +237,7 @@ holo = transform(
                     restored_img_size = (int(img.shape[0]*2), int(img.shape[1]*2)),
                     control=True,
                 )
-cv2.imwrite("C:\\Users\\minik\\Desktop\\holo.bmp", holo)
+cv2.imwrite("C:\\Users\\minik\\Desktop\\holo_cat.bmp", holo)
     
         
         

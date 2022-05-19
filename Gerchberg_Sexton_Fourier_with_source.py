@@ -20,9 +20,11 @@ class GS_Fresnel_ws_synthesis(GS_Fresnel_synthesis):
                     dynamic_range,
                     del_area,
                     random_tr = False,
+                    save_errors = False,
                     alpha = None,
                     epochs = None,
                 ):
+        self.save_errors = save_errors
         self.random_tr = random_tr
         self.alpha = alpha 
         self.epochs = epochs
@@ -180,7 +182,11 @@ class GS_Fresnel_ws_synthesis(GS_Fresnel_synthesis):
                     exit()
                 
                 Ans = np.fft.ifftshift(np.fft.ifft2(np.fft.ifftshift(Ans)))
-                Ans = abs(self.informative_zone(Ans, position, reshaped_img_position_coord_h_w))**2
+                Ans = abs(Ans)**2
+                self.recovery_img = Ans 
+                Ans = self.informative_zone(Ans, position, reshaped_img_position_coord_h_w)
+                self.inf_recovery_img = Ans
+                
                 error = self.calc_error(
                                         Ans,
                                         self.informative_zone(img, position, reshaped_img_position_coord_h_w)
@@ -208,36 +214,43 @@ class GS_Fresnel_ws_synthesis(GS_Fresnel_synthesis):
                         source_amplitude = self.source_amplitude,
                         source_phase=self.source_phase,
                         holo_size = self.holo_size,
+                        save_errors = self.save_errors,
                         reshaped_img_position_coord_h_w = None,)
 
-                holo_final = search(holo_final)      
+                holo_final, self.recovery_img, self.inf_recovery_img = search(holo_final)      
             print("Finish --- %s seconds ---" % (time.time() - start_time))
             return holo_final
 transform = GS_Fresnel_ws_synthesis(
     holo_pixel_size = (8e-6, 8e-6),
-    distance = 0.2,
+    distance = 0.3,
     wavelength = 532e-9,
-    holo_size = (256,256),
+    holo_size = (1024,1024),
     error_dif = 1e-4,
     holo_type = 'phase',
-    dynamic_range = 'bin',
-    iter_limit = 30,
+    dynamic_range = 'gray',
+    iter_limit = 40,
     del_area = 0,
     source_distance = 0.3,
-    random_tr = True,
-    alpha = 0.8,
-    epochs = 1
+    random_tr = False,
+    save_errors = True,
+    alpha = 0.5,
+    epochs = 3
 
 )
-img = cv2.imread("C:\\Users\\minik\\Desktop\\cat_64.tif", cv2.IMREAD_GRAYSCALE)
+img = cv2.imread("C:\\Users\\minik\\Desktop\\I_gray.jpg", cv2.IMREAD_GRAYSCALE)
 holo = transform(
                     img, 
                     position='centre', 
                     reshaped_img_position_coord_h_w = (100,100), 
-                    restored_img_size = (int(img.shape[0]*2), int(img.shape[1]*2)),
+                    restored_img_size = (int(img.shape[0]/5), int(img.shape[1]/5)),
                     control=True,
                 )
-cv2.imwrite("C:\\Users\\minik\\Desktop\\holo_cat.bmp", holo)
+name_holo = "holo_I_gray_gray_phase_size_div 5_1024x1024.bmp"
+name_restored = "rest_I_gray_gray_phase_1024x1024_dist_03.bmp"
+name_restored_inf = "rest_inf_I_gray_gray_phase_1024x1024_dist_03.bmp"
+cv2.imwrite("C:\\Users\\minik\\Desktop\\" + name_holo, holo)
+plt.imsave("C:\\Users\\minik\\Desktop\\" + name_restored, transform.recovery_img, cmap='gray')
+plt.imsave("C:\\Users\\minik\\Desktop\\" + name_restored_inf, transform.inf_recovery_img, cmap='gray')
     
         
         

@@ -3,6 +3,7 @@ import time
 import copy
 import random
 import matplotlib.pyplot as plt
+import numpy as np
 class DSWRT(object):
     def __init__(
                     self, 
@@ -15,8 +16,10 @@ class DSWRT(object):
                     source_amplitude,
                     source_phase,
                     holo_size,
+                    save_errors = False,
                     reshaped_img_position_coord_h_w = None,
                 ):
+        self.save_errors = save_errors
         self.NSTD_errors = []
         self.DE_errors = []
         self.TFs = []
@@ -94,6 +97,31 @@ class DSWRT(object):
         DE = DE.to(device)
         return float(DE)    
 
+    def save(self):
+        name = input("Enter_the_name ")
+        np.savetxt('C:\\Users\\minik\\Desktop\\TF_{}_size_{}x{}_epoch_{}_alpha_{}.txt'.format(
+                                                                    name, 
+                                                                    str(self.holo_size[0]),
+                                                                    str(self.holo_size[1]), 
+                                                                    str(self.epochs), 
+                                                                    str(self.alpha)
+                                                                ), np.array(self.TFs))
+        np.savetxt('C:\\Users\\minik\\Desktop\\NSTD_{}_size_{}x{}_epoch_{}_alpha_{}.txt'.format(
+                                                                    name, 
+                                                                    str(self.holo_size[0]),
+                                                                    str(self.holo_size[1]), 
+                                                                    str(self.epochs), 
+                                                                    str(self.alpha)
+                                                                ), np.array(self.NSTD_errors))
+                                                                
+        np.savetxt('C:\\Users\\minik\\Desktop\\DE_{}_size_{}x{}_epoch_{}_alpha_{}.txt'.format(
+                                                                    name, 
+                                                                    str(self.holo_size[0]),
+                                                                    str(self.holo_size[1]), 
+                                                                    str(self.epochs), 
+                                                                    str(self.alpha)
+                                                                ), np.array(self.DE_errors))
+
     def __call__(self, holo):
         print("DSWRT start")
         start_time = time.time()
@@ -138,8 +166,10 @@ class DSWRT(object):
 
                 restored_img = torch.fft.ifftshift(torch.fft.ifft2(torch.fft.ifftshift(new_holo)))
                 restored_img = abs(restored_img) **2
+                self.restored_img = restored_img
                 DE = self.DE(restored_img)
                 restored_img = self.informative_zone(restored_img)
+                self.inf_restored_img = restored_img
                 NSTD = self.NSTD(restored_img, self.perfect_informative_img)
                 TF = self.alpha * NSTD + (1 - self.alpha) * (1- DE) 
                 if TF >= self.best_TF:
@@ -167,12 +197,17 @@ class DSWRT(object):
         device = torch.device('cpu')
         holo =  holo.to(device)
         holo = holo.numpy()
-        restored_img = restored_img.to(device)
-        restored_img = restored_img.numpy()
-        plt.imshow(restored_img, cmap='gray')
+
+        self.restored_img = self.restored_img.to(device)
+        self.restored_img = self.restored_img.numpy()
+
+        self.inf_restored_img = self.inf_restored_img.to(device)
+        self.inf_restored_img = self.inf_restored_img.numpy()
+
+        plt.imshow(self.inf_restored_img, cmap='gray')
         plt.show()
-        plt.imshow(holo, cmap='gray')
-        plt.show()
+        if self.save_errors:
+            self.save()
         print("DSWRT finish --- %s seconds ---" % (time.time() - start_time))
-        return holo
+        return holo, self.restored_img, self.inf_restored_img
 
